@@ -28,7 +28,6 @@ def get_config(config_string):
                 "include": [
                     [
                         "icra/?*/?*/?*",
-                        "icra_validation/?*/?*/?*",
                         "flap/?*/?*/?*",
                         "bridge_data_v1/berkeley/?*/?*",
                         "rss/?*/?*/?*",
