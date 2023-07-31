@@ -1,15 +1,15 @@
-# Jax BC/RL Implementations for Training on BridgeData V2
+# Jax BC/RL Implementations for BridgeData V2
 
 This repository provides code for training on [BridgeData V2](https://rail-berkeley.github.io/bridgedata/).
 
 We provide implementations for the following methods (described in the paper):
 
 - Goal-conditioned BC
-- Goal-conditioned BC with a diffusion policy [Chi et al.](https://diffusion-policy.cs.columbia.edu/)
-- Goal-condtioned IQL [Kostrikov et al.](https://arxiv.org/abs/2110.06169)
-- Goal-conditioned contrastive RL [Zheng et al., Eysenbach et al.](https://chongyi-zheng.github.io/stable_contrastive_rl/)
+- Goal-conditioned BC with a diffusion policy [[Chi et al.]](https://diffusion-policy.cs.columbia.edu/)
+- Goal-condtioned IQL [[Kostrikov et al.]](https://arxiv.org/abs/2110.06169)
+- Goal-conditioned contrastive RL [[Zheng et al., Eysenbach et al.]](https://chongyi-zheng.github.io/stable_contrastive_rl/)
 
-The code for RT-1 can be found [here](https://github.com/google-research/robotics_transformer) and the code for the LCBC method will be released soon. 
+The code for RT-1 can be found [here](https://github.com/google-research/robotics_transformer) and the code for the language-conditioned BC method will be released soon. 
 
 ## Data 
 
@@ -17,7 +17,7 @@ The raw dataset (comprised of JPEGs, PNGs, and pkl files) can be downloaded from
 
 ## Training
 
-To start training run the command below. Replace `METHOD` with one of `gc_bc`, `gc_ddpm_bc`, `gc_iql`, or `contrastive_rl_td` and `NAME` with a name for the run. 
+To start training run the command below. Replace `METHOD` with one of `gc_bc`, `gc_ddpm_bc`, `gc_iql`, or `contrastive_rl_td`, and replace `NAME` with a name for the run. 
 
 ```
 python experiments/bridgedata_offline_gc.py \
@@ -30,7 +30,7 @@ Training hyperparameters can be modified in `experiments/configs/data_config.py`
 
 ## Evaluation
 
-First, install our WidowX robot controller stack from this repo. Then, run the command:
+First, install our WidowX robot controller stack from this repo (TODO). Then, run the command:
 
 ```
 python experiments/eval_policy.py \
@@ -43,7 +43,7 @@ python experiments/eval_policy.py \
 
 The script loads some information about the checkpoint from its corresponding WandB run.
 
-Checkpoints for each of the methods evaluated in the paper are available [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/checkpoints/). Each checkpoint has an associated json file with its configuration information. To evaluate these checkpoints with the above script, modify the references to the wandb run configuration to use the dictionary provided in the json file instead.
+Checkpoints for each of the methods evaluated in the paper are available [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/checkpoints/). Each checkpoint has an associated JSON file with its configuration information. To evaluate these checkpoints with the above script, modify the references to the wandb run configuration to use the dictionary provided in the JSON file instead.
 
 ## Environment
 
