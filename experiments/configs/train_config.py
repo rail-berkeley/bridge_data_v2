@@ -2,7 +2,6 @@ from ml_collections import ConfigDict
 
 
 def get_config(config_string):
-
     base_real_config = dict(
         batch_size=256,
         num_steps=int(2e6),
@@ -33,7 +32,7 @@ def get_config(config_string):
                 "random_saturation",
                 "random_hue",
             ],
-        )
+        ),
     )
 
     possible_structures = {
@@ -59,13 +58,13 @@ def get_config(config_string):
                     early_goal_concat=True,
                     shared_goal_encoder=True,
                     use_proprio=False,
-                    negative_proportion=0.1
+                    negative_proportion=0.1,
                 ),
                 dataset_kwargs=dict(
                     goal_relabeling_strategy="uniform",
                     goal_relabeling_kwargs=dict(reached_proportion=0.1),
                     relabel_actions=True,
-                    **base_data_config
+                    **base_data_config,
                 ),
                 encoder="resnetv1-34-bridge",
                 encoder_kwargs=dict(
@@ -100,7 +99,7 @@ def get_config(config_string):
                     goal_relabeling_strategy="uniform",
                     goal_relabeling_kwargs=dict(reached_proportion=0.0),
                     relabel_actions=True,
-                    **base_data_config
+                    **base_data_config,
                 ),
                 encoder="resnetv1-34-bridge",
                 encoder_kwargs=dict(
@@ -108,7 +107,7 @@ def get_config(config_string):
                     add_spatial_coordinates=True,
                     act="swish",
                 ),
-                **base_real_config
+                **base_real_config,
             )
         ),
         "gc_ddpm_bc": ConfigDict(
@@ -139,7 +138,7 @@ def get_config(config_string):
                     goal_relabeling_kwargs=dict(reached_proportion=0.0),
                     relabel_actions=True,
                     act_pred_horizon=4,
-                    **base_data_config
+                    **base_data_config,
                 ),
                 encoder="resnetv1-34-bridge",
                 encoder_kwargs=dict(
@@ -147,7 +146,7 @@ def get_config(config_string):
                     add_spatial_coordinates=True,
                     act="swish",
                 ),
-                **base_real_config
+                **base_real_config,
             )
         ),
         "contrastive_rl_td": ConfigDict(
@@ -189,7 +188,7 @@ def get_config(config_string):
                     goal_relabeling_strategy="uniform",
                     goal_relabeling_kwargs=dict(reached_proportion=0.0),
                     relabel_actions=True,
-                    **base_data_config
+                    **base_data_config,
                 ),
                 encoder="resnetv1-34-bridge",
                 encoder_kwargs=dict(
@@ -197,7 +196,7 @@ def get_config(config_string):
                     add_spatial_coordinates=False,
                     act="swish",
                 ),
-                **base_real_config
+                **base_real_config,
             )
         ),
     }

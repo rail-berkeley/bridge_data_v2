@@ -206,7 +206,6 @@ class ResNetEncoder(nn.Module):
 
     @nn.compact
     def __call__(self, observations: jnp.ndarray, train: bool = True, cond_var=None):
-
         # put inputs in [-1, 1]
         x = observations.astype(jnp.float32) / 127.5 - 1.0
 
@@ -220,28 +219,9 @@ class ResNetEncoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
         )
         if self.norm == "batch":
-            # TODO: batchnorm requires special consideration with the mutable
-            # batch_stats collection
             raise NotImplementedError()
-            norm = partial(
-                nn.BatchNorm,
-                use_running_average=not train,
-                momentum=0.9,
-                epsilon=1e-5,
-                dtype=self.dtype,
-            )
         elif self.norm == "group":
             norm = partial(MyGroupNorm, num_groups=4, epsilon=1e-5, dtype=self.dtype)
-        # elif self.norm == 'cross':
-        #     raise NotImplementedError()
-        #     norm = partial(
-        #         # TODO: This is undefined.
-        #         CrossNorm,
-        #         use_running_average=not train,
-        #         momentum=0.9,
-        #         epsilon=1e-5,
-        #         dtype=self.dtype,
-        #     )
         elif self.norm == "layer":
             norm = partial(
                 nn.LayerNorm,

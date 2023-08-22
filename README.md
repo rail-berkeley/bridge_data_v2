@@ -9,18 +9,20 @@ We provide implementations for the following methods (described in the paper):
 - Goal-condtioned IQL [[Kostrikov et al.]](https://arxiv.org/abs/2110.06169)
 - Goal-conditioned contrastive RL [[Zheng et al., Eysenbach et al.]](https://chongyi-zheng.github.io/stable_contrastive_rl/)
 
-The code for RT-1 can be found [here](https://github.com/google-research/robotics_transformer) and the code for the language-conditioned BC method will be released soon. 
+The code for RT-1 can be found [here](https://github.com/google-research/robotics_transformer), the code for ACT can be found [here](https://github.com/tonyzhaozh/act), and the code for the language-conditioned BC method will be released soon. 
+
+Please open a GitHub issue if you encounter problems with this code. 
 
 ## Data 
 
-The raw dataset (comprised of JPEGs, PNGs, and pkl files) can be downloaded from the [website](https://rail-berkeley.github.io/bridgedata/). For training, the raw data needs to be converted into a TFRecord format that is compatible with the data loader. First, use `scripts/bridgedata_raw_to_numpy.py` to convert the raw data into numpy files. Then, use `scripts/bridgedata_numpy_to_tfrecord.py` to convert the numpy files into TFRecord files. 
+The raw dataset (comprised of JPEGs, PNGs, and pkl files) can be downloaded from the [website](https://rail-berkeley.github.io/bridgedata/). For training, the raw data needs to be converted into a TFRecord format that is compatible with the data loader. First, use `data_processing/bridgedata_raw_to_numpy.py` to convert the raw data into numpy files. Then, use `data_processing/bridgedata_numpy_to_tfrecord.py` to convert the numpy files into TFRecord files. 
 
 ## Training
 
 To start training run the command below. Replace `METHOD` with one of `gc_bc`, `gc_ddpm_bc`, `gc_iql`, or `contrastive_rl_td`, and replace `NAME` with a name for the run. 
 
 ```
-python experiments/bridgedata_offline_gc.py \
+python experiments/train.py \
     --config experiments/configs/train_config.py:METHOD \
     --bridgedata_config experiments/configs/data_config.py:all \
     --name NAME
@@ -43,7 +45,13 @@ python experiments/eval_policy.py \
 
 The script loads some information about the checkpoint from its corresponding WandB run.
 
-Checkpoints for each of the methods evaluated in the paper are available [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/checkpoints/). Each checkpoint has an associated JSON file with its configuration information. To evaluate these checkpoints with the above script, modify the references to the wandb run configuration to use the dictionary provided in the JSON file instead.
+## Provided Checkpoints
+
+Checkpoints for GCBC, D-GCBC, GCIQL, CRL, and RT-1 are available [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/checkpoints/). Each checkpoint (except RT-1) has an associated JSON file with its configuration information. To evaluate these checkpoints with the above evaluation script, modify the references to the wandb run configuration to use the dictionary provided in the JSON file instead.
+
+An evaluation script for the RT-1 checkpoint is available in this separate repo (TODO).
+
+We don't currently have checkpoints for ACT or LCBC available but may release them soon. 
 
 ## Environment
 
@@ -57,12 +65,12 @@ pip install -r requirements.txt
 ```
 For GPU:
 ```
-pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install --upgrade "jax[cuda11_pip]==0.4.13" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
 For TPU
 ```
-pip install --upgrade "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+pip install --upgrade "jax[tpu]==0.4.13" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
 ```
 See the [Jax Github page](https://github.com/google/jax) for more details on installing Jax. 
 

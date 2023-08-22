@@ -116,7 +116,7 @@ class GCDDPMBCAgent(flax.struct.PyTreeNode):
                 (observations, goals),
                 current_x,
                 input_time,
-                name="actor"
+                name="actor",
             )
 
             alpha_1 = 1 / jnp.sqrt(self.config["alphas"][time])
@@ -163,7 +163,10 @@ class GCDDPMBCAgent(flax.struct.PyTreeNode):
 
         action_0, rng = input_tuple
 
-        return action_0[0]
+        if len(observations["image"].shape) == 4:
+            return action_0[0]
+        else:
+            return action_0
 
     @jax.jit
     def get_debug_metrics(self, batch, seed, gripper_close_val=None):

@@ -1,5 +1,6 @@
 gym >= 0.26
 numpy==1.24.3
+jax==0.4.13
 distrax==0.1.2
 flax==0.7.0
 ml_collections >= 0.1.0
