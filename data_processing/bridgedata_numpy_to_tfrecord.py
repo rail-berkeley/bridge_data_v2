@@ -15,27 +15,27 @@ Consider the following directory structure for the input data:
         icra/
             ...
 
-The --depth parameter controls how much of the data to process at the 
---input_path; for example, if --depth=5, then --input_path should be 
-"bridgedata_numpy", and all data will be processed. If --depth=3, then 
---input_path should be "bridgedata_numpy/rss/toykitchen2", and only data 
+The --depth parameter controls how much of the data to process at the
+--input_path; for example, if --depth=5, then --input_path should be
+"bridgedata_numpy", and all data will be processed. If --depth=3, then
+--input_path should be "bridgedata_numpy/rss/toykitchen2", and only data
 under "toykitchen2" will be processed.
 
-The same directory structure will be replicated under --output_path.  For 
-example, in the second case, the output will be written to 
+The same directory structure will be replicated under --output_path.  For
+example, in the second case, the output will be written to
 "{output_path}/set_table/00/...".
 
 Can read/write directly from/to Google Cloud Storage.
 
 Written by Kevin Black (kvablack@berkeley.edu).
 """
-from absl import app, flags, logging
-import numpy as np
 import os
-import tqdm
-import tensorflow as tf
 from multiprocessing import Pool
 
+import numpy as np
+import tensorflow as tf
+import tqdm
+from absl import app, flags, logging
 
 FLAGS = flags.FLAGS
 
@@ -108,6 +108,7 @@ def process(path):
                                 dtype=np.float32,
                             )
                         ),
+                        "language": tensor_feature(traj["language"]),
                         "actions": tensor_feature(
                             np.array(traj["actions"], dtype=np.float32)
                         ),

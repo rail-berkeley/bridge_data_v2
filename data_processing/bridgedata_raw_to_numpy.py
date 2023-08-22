@@ -27,14 +27,14 @@ Consider the following directory structure for the input data:
                     01/
                     ...
 
-The --depth parameter controls how much of the data to process at the 
---input_path; for example, if --depth=5, then --input_path should be 
-"bridgedata_raw", and all data will be processed. If --depth=3, then 
---input_path should be "bridgedata_raw/rss/toykitchen2", and only data 
+The --depth parameter controls how much of the data to process at the
+--input_path; for example, if --depth=5, then --input_path should be
+"bridgedata_raw", and all data will be processed. If --depth=3, then
+--input_path should be "bridgedata_raw/rss/toykitchen2", and only data
 under "toykitchen2" will be processed.
 
-The same directory structure will be replicated under --output_path.  For 
-example, in the second case, the output will be written to 
+The same directory structure will be replicated under --output_path.  For
+example, in the second case, the output will be written to
 "{output_path}/set_table/00/...".
 
 Squashes images to 128x128.
@@ -44,19 +44,20 @@ Can write directly to Google Cloud Storage, but not read from it.
 Written by Kevin Black (kvablack@berkeley.edu).
 """
 import copy
-from functools import partial
-import tensorflow as tf
-from datetime import datetime
 import glob
 import os
-from collections import defaultdict
-from PIL import Image
 import pickle
-import numpy as np
-from absl import app, flags, logging
-import tqdm
 import random
+from collections import defaultdict
+from datetime import datetime
+from functools import partial
 from multiprocessing import Pool
+
+import numpy as np
+import tensorflow as tf
+import tqdm
+from absl import app, flags, logging
+from PIL import Image
 
 FLAGS = flags.FLAGS
 
@@ -73,11 +74,12 @@ flags.DEFINE_float(
     "train_proportion", 0.9, "Proportion of data to use for training (rather than val)"
 )
 flags.DEFINE_integer("num_workers", 8, "Number of threads to use")
+flags.DEFINE_integer("im_size", 128, "Image size")
 
 
-def squash(path):  # squash from 480x640 to 128x128 and flattened as a tensor
+def squash(path):  # squash from 480x640 to im_size
     im = Image.open(path)
-    im = im.resize((128, 128), Image.LANCZOS)
+    im = im.resize((FLAGS.im_size, FLAGS.im_size), Image.Resampling.LANCZOS)
     out = np.asarray(im).astype(np.uint8)
     return out
 
@@ -175,6 +177,13 @@ def process_dc(path, train_ratio=0.9):
             state, next_state = process_state(tp)
             time_stamp, next_time_stamp = process_time(tp)
             term = [0] * len(acts)
+            if "lang.txt" in ld:
+                with open(os.path.join(tp, "lang.txt")) as f:
+                    lang = list(f)
+                    lang = [l.strip() for l in lang if "confidence" not in l]
+            else:
+                # empty string is a placeholder for data with no language label
+                lang = [""]
 
             out["observations"] = obs
             out["observations"]["state"] = state
@@ -194,6 +203,7 @@ def process_dc(path, train_ratio=0.9):
 
             out["actions"] = acts
             out["terminals"] = term
+            out["language"] = lang
 
             # shift the actions according to camera latency
             if latency_shift:
@@ -230,7 +240,7 @@ def process_dc(path, train_ratio=0.9):
 def make_numpy(path, train_proportion):
     dirname = os.path.abspath(path)
     outpath = os.path.join(
-        FLAGS.output_path, *dirname.split(os.sep)[-(FLAGS.depth - 1) :]
+        FLAGS.output_path, *dirname.split(os.sep)[-(max(FLAGS.depth - 1, 1)) :]
     )
 
     if os.path.exists(outpath):
