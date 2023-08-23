@@ -2,14 +2,21 @@
 
 This repository provides code for training on [BridgeData V2](https://rail-berkeley.github.io/bridgedata/).
 
-We provide implementations for the following methods (described in the paper):
+We provide implementations for the following subset of methods described in the paper:
 
 - Goal-conditioned BC
-- Goal-conditioned BC with a diffusion policy [[Chi et al.]](https://diffusion-policy.cs.columbia.edu/)
-- Goal-condtioned IQL [[Kostrikov et al.]](https://arxiv.org/abs/2110.06169)
-- Goal-conditioned contrastive RL [[Zheng et al., Eysenbach et al.]](https://chongyi-zheng.github.io/stable_contrastive_rl/)
+- Goal-conditioned BC with a diffusion policy 
+- Goal-condtioned IQL
+- Goal-conditioned contrastive RL 
 
-The code for RT-1 can be found [here](https://github.com/google-research/robotics_transformer), the code for ACT can be found [here](https://github.com/tonyzhaozh/act), and the code for the language-conditioned BC method will be released soon. 
+The code for the language-conditioned BC method may be released soon.
+
+The official implementations and papers for all the methods can be found here:
+- [IQDL](https://github.com/philippe-eecs/IDQL) (IQL + diffusion policy) [[Hansen-Estruch et al.](https://github.com/philippe-eecs/IDQL)] and [Diffusion Policy](https://diffusion-policy.cs.columbia.edu/) [[Chi et al.](https://diffusion-policy.cs.columbia.edu/)]
+- [IQL](https://github.com/ikostrikov/implicit_q_learning) [[Kostrikov et al.](https://arxiv.org/abs/2110.06169)]
+- [Contrastive RL](https://chongyi-zheng.github.io/stable_contrastive_rl/) [[Zheng et al.](https://arxiv.org/abs/2306.03346), [Eysenbach et al.](https://arxiv.org/abs/2206.07568)]
+- [RT1](https://github.com/google-research/robotics_transformer) [[Brohan et al.](https://arxiv.org/abs/2212.06817)]
+- [ACT](https://github.com/tonyzhaozh/act) [[Zhao et al.](https://arxiv.org/abs/2304.13705)]
 
 Please open a GitHub issue if you encounter problems with this code. 
 
