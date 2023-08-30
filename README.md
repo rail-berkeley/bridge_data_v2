@@ -39,7 +39,7 @@ Training hyperparameters can be modified in `experiments/configs/data_config.py`
 
 ## Evaluation
 
-First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from this repo (TODO). Then, run the command:
+First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https:/1/github.com/rail-berkeley/bridge_data_robot). Then, run the command:
 
 ```
 python experiments/eval_policy.py \
