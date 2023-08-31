@@ -88,9 +88,10 @@ This code is based on [dibyaghosh/jaxrl_m](https://github.com/dibyaghosh/jaxrl_m
 If you use this code and/or BridgeData V2 in your work, please cite the paper with:
 
 ```
-@article{walke2023bridgedata,
+@inproceedings{walke2023bridgedata,
   title={BridgeData V2: A Dataset for Robot Learning at Scale},
-  author={Walke, Homer and Black, Kevin and Zhao, Tony and Vuong, Quan and Zheng, Chongyi and Hansen-Estruch, Philippe and He, Andre and Myers, Vivek and Kim, Moo Jin and Du, Max and Lee, Abraham and Fang, Kuan and Finn, Chelsea and Levine, Sergey},
+  author={Walke, Homer and Black, Kevin and Lee, Abraham and Kim, Moo Jin and Du, Max and Zheng, Chongyi and Zhao, Tony and Hansen-Estruch, Philippe and Vuong, Quan and He, Andre and Myers, Vivek and Fang, Kuan and Finn, Chelsea and Levine, Sergey},
+  booktitle={Conference on Robot Learning (CoRL)},
   year={2023}
 }
 ```
