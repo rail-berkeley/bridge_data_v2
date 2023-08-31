@@ -42,7 +42,7 @@ Training hyperparameters can be modified in `experiments/configs/data_config.py`
 First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https://github.com/rail-berkeley/bridge_data_robot). Then, run the command:
 
 ```
-python experiments/eval_policy.py \
+python experiments/eval.py \
     --num_timesteps NUM_TIMESTEPS \
     --video_save_path VIDEO_DIR \
     --checkpoint_path CHECKPOINT_PATH \
