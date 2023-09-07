@@ -1,5 +1,4 @@
 import sys
-from widowx_envs.widowx.widowx_env import BridgeDataRailRLPrivateWidowX
 import os
 import numpy as np
 from PIL import Image
@@ -18,7 +17,10 @@ from datetime import datetime
 import jax
 import time
 import tensorflow as tf
-from widowx_envs.utils.multicam_server_rospkg.src.topic_utils import IMTopic
+
+# bridge_data_robot imports
+from widowx_envs.widowx_env import BridgeDataRailRLPrivateWidowX
+from multicam_server.topic_utils import IMTopic
 
 np.set_printoptions(suppress=True)
 
