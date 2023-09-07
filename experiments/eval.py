@@ -154,14 +154,14 @@ def main(_):
                 low_bound = [0.24, -0.1, 0.05, -1.57, 0]
                 high_bound = [0.4, 0.20, 0.15, 1.57, 0]
                 goal_eep = np.random.uniform(low_bound[:3], high_bound[:3])
-            env._controller.open_gripper(True)
+            env.controller().open_gripper(True)
             try:
-                env._controller.move_to_state(goal_eep, 0, duration=1.5)
+                env.controller().move_to_state(goal_eep, 0, duration=1.5)
                 env._reset_previous_qpos()
             except Exception as e:
                 continue
             input("Press [Enter] when ready for taking the goal image. ")
-            obs = env._get_obs()
+            obs = env.current_obs()
             image_goal = (
                 obs["image"].reshape(3, 128, 128).transpose(1, 2, 0) * 255
             ).astype(np.uint8)
@@ -190,14 +190,14 @@ def main(_):
             if FLAGS.initial_eep is not None:
                 assert isinstance(FLAGS.initial_eep, list)
                 initial_eep = [float(e) for e in FLAGS.initial_eep]
-                env._controller.move_to_state(initial_eep, 0, duration=1.5)
+                env.controller().move_to_state(initial_eep, 0, duration=1.5)
                 env._reset_previous_qpos()
         except Exception as e:
             continue
 
         # do rollout
         rng = jax.random.PRNGKey(0)
-        obs = env._get_obs()
+        obs = env.current_obs()
         last_tstep = time.time()
         images = []
         full_images = []
