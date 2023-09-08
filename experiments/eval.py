@@ -157,7 +157,6 @@ def main(_):
             env.controller().open_gripper(True)
             try:
                 env.controller().move_to_state(goal_eep, 0, duration=1.5)
-                env._reset_previous_qpos()
             except Exception as e:
                 continue
             input("Press [Enter] when ready for taking the goal image. ")
@@ -191,7 +190,6 @@ def main(_):
                 assert isinstance(FLAGS.initial_eep, list)
                 initial_eep = [float(e) for e in FLAGS.initial_eep]
                 env.controller().move_to_state(initial_eep, 0, duration=1.5)
-                env._reset_previous_qpos()
         except Exception as e:
             continue
 
