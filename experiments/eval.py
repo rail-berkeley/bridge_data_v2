@@ -1,23 +1,24 @@
 import sys
-from widowx_envs.widowx.widowx_env import BridgeDataRailRLPrivateWidowX
 import os
-import numpy as np
-from PIL import Image
-from flax.training import checkpoints
-import traceback
-import wandb
-from jaxrl_m.vision import encoders
-from jaxrl_m.agents import agents
-import matplotlib
-from absl import app, flags, logging
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+import json
 import time
 from datetime import datetime
-import jax
-import time
+import traceback
+
+import matplotlib
+from absl import app, flags, logging
+matplotlib.use("Agg")
+
+import numpy as np
 import tensorflow as tf
+import jax
+from PIL import Image
+
+from flax.training import checkpoints
+from jaxrl_m.vision import encoders
+from jaxrl_m.agents import agents
+
+from widowx_envs.widowx.widowx_env import BridgeDataRailRLPrivateWidowX
 from widowx_envs.utils.multicam_server_rospkg.src.topic_utils import IMTopic
 
 np.set_printoptions(suppress=True)
@@ -26,8 +27,8 @@ logging.set_verbosity(logging.WARNING)
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_multi_string("checkpoint_path", None, "Path to checkpoint", required=True)
-flags.DEFINE_multi_string("wandb_run_name", None, "Name of wandb run", required=True)
+flags.DEFINE_multi_string("checkpoint_weights_path", None, "Path to checkpoint weights", required=True)
+flags.DEFINE_multi_string("checkpoint_config_path", None, "Path to checkpoint config", required=True)
 flags.DEFINE_string("video_save_path", None, "Path to save video")
 flags.DEFINE_string(
     "goal_image_path",
@@ -52,13 +53,11 @@ def unnormalize_action(action, mean, std):
     return action * std + mean
 
 
-def load_checkpoint(path, wandb_run_name):
-    # load information from wandb
-    api = wandb.Api()
-    run = api.run(wandb_run_name)
-
-    # create encoder from wandb config
-    encoder_def = encoders[run.config["encoder"]](**run.config["encoder_kwargs"])
+def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
+    with open(checkpoint_config_path, 'r') as f:
+        config = json.load(f)    
+    
+    encoder_def = encoders[config["encoder"]](**config["encoder_kwargs"])
 
     example_batch = {
         "observations": {"image": np.zeros((128, 128, 3), dtype=np.uint8)},
@@ -69,42 +68,36 @@ def load_checkpoint(path, wandb_run_name):
     # create agent from wandb config
     rng = jax.random.PRNGKey(0)
     rng, construct_rng = jax.random.split(rng)
-    agent = agents[run.config["agent"]].create(
+    agent = agents[config["agent"]].create(
         rng=construct_rng,
         observations=example_batch["observations"],
         goals=example_batch["goals"],
         actions=example_batch["actions"],
         encoder_def=encoder_def,
-        **run.config["agent_kwargs"],
+        **config["agent_kwargs"],
     )
 
     # load action metadata from wandb
-    action_metadata = run.config["bridgedata_config"]["action_metadata"]
+    action_metadata = config["bridgedata_config"]["action_metadata"]
     action_mean = np.array(action_metadata["mean"])
     action_std = np.array(action_metadata["std"])
 
     # hydrate agent with parameters from checkpoint
-    agent = checkpoints.restore_checkpoint(path, agent)
+    agent = checkpoints.restore_checkpoint(checkpoint_weights_path, agent)
 
     return agent, action_mean, action_std
 
 
 def main(_):
-    assert len(FLAGS.checkpoint_path) == len(FLAGS.wandb_run_name)
-
     # policies is a dict from run_name to (agent, action_mean, action_std)
     policies = {}
-    for checkpoint_path, wandb_run_name in zip(
-        FLAGS.checkpoint_path, FLAGS.wandb_run_name
-    ):
-        assert tf.io.gfile.exists(checkpoint_path), checkpoint_path
-        agent, action_mean, action_std = load_checkpoint(
-            checkpoint_path, wandb_run_name
-        )
-        checkpoint_num = int(checkpoint_path.split("_")[-1])
-        run_name = wandb_run_name.split("/")[-1]
-        policies[f"{run_name}-{checkpoint_num}"] = (agent, action_mean, action_std)
-
+    for checkpoint_weights_path, checkpoint_config_path in zip(FLAGS.checkpoint_weights_path, FLAGS.checkpoint_config_path):
+        assert tf.io.gfile.exists(checkpoint_weights_path), checkpoint_weights_path
+        assert tf.io.gfile.exists(checkpoint_config_path), checkpoint_config_path
+        checkpoint_num = int(checkpoint_weights_path.split("_")[-1])
+        agent, action_mean, action_std = load_checkpoint(checkpoint_weights_path=checkpoint_weights_path, checkpoint_config_path=checkpoint_config_path)
+        policies[f"{checkpoint_num}"] = (agent, action_mean, action_std)
+    
     if FLAGS.initial_eep is not None:
         assert isinstance(FLAGS.initial_eep, list)
         initial_eep = [float(e) for e in FLAGS.initial_eep]
