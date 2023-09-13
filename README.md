@@ -45,8 +45,8 @@ First, set up the robot hardware according to our [guide](https://docs.google.co
 python experiments/eval.py \
     --num_timesteps NUM_TIMESTEPS \
     --video_save_path VIDEO_DIR \
-    --checkpoint_path CHECKPOINT_PATH \
-    --wandb_run_name WANDB_RUN_NAME \
+    --checkpoint_weights_path CHECKPOINT_WEIGHTS_PATH \
+    --checkpoint_config_path CHECKPOINT_CONFIG_PATH \
     --blocking
 ```
 
