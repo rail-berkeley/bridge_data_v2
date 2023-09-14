@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import os
 import json
@@ -11,6 +13,7 @@ matplotlib.use("Agg")
 
 import numpy as np
 import tensorflow as tf
+
 import jax
 from PIL import Image
 
@@ -18,8 +21,9 @@ from flax.training import checkpoints
 from jaxrl_m.vision import encoders
 from jaxrl_m.agents import agents
 
-from widowx_envs.widowx.widowx_env import BridgeDataRailRLPrivateWidowX
-from widowx_envs.utils.multicam_server_rospkg.src.topic_utils import IMTopic
+# bridge_data_robot imports
+from widowx_envs.widowx_env import BridgeDataRailRLPrivateWidowX
+from multicam_server.topic_utils import IMTopic
 
 np.set_printoptions(suppress=True)
 
@@ -145,14 +149,13 @@ def main(_):
                 low_bound = [0.24, -0.1, 0.05, -1.57, 0]
                 high_bound = [0.4, 0.20, 0.15, 1.57, 0]
                 goal_eep = np.random.uniform(low_bound[:3], high_bound[:3])
-            env._controller.open_gripper(True)
+            env.controller().open_gripper(True)
             try:
-                env._controller.move_to_state(goal_eep, 0, duration=1.5)
-                env._reset_previous_qpos()
+                env.controller().move_to_state(goal_eep, 0, duration=1.5)
             except Exception as e:
                 continue
             input("Press [Enter] when ready for taking the goal image. ")
-            obs = env._get_obs()
+            obs = env.current_obs()
             image_goal = (
                 obs["image"].reshape(3, 128, 128).transpose(1, 2, 0) * 255
             ).astype(np.uint8)
@@ -181,14 +184,13 @@ def main(_):
             if FLAGS.initial_eep is not None:
                 assert isinstance(FLAGS.initial_eep, list)
                 initial_eep = [float(e) for e in FLAGS.initial_eep]
-                env._controller.move_to_state(initial_eep, 0, duration=1.5)
-                env._reset_previous_qpos()
+                env.controller().move_to_state(initial_eep, 0, duration=1.5)
         except Exception as e:
             continue
 
         # do rollout
         rng = jax.random.PRNGKey(0)
-        obs = env._get_obs()
+        obs = env.current_obs()
         last_tstep = time.time()
         images = []
         full_images = []
