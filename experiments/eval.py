@@ -22,8 +22,8 @@ from jaxrl_m.vision import encoders
 from jaxrl_m.agents import agents
 
 # bridge_data_robot imports
-from widowx_envs.widowx_env import BridgeDataRailRLPrivateWidowX
-from multicam_server.topic_utils import IMTopic
+from widowx_envs.widowx_env_service import WidowXClient
+
 
 np.set_printoptions(suppress=True)
 
@@ -44,6 +44,8 @@ flags.DEFINE_bool("blocking", False, "Use the blocking controller")
 flags.DEFINE_spaceseplist("goal_eep", None, "Goal position")
 flags.DEFINE_spaceseplist("initial_eep", None, "Initial position")
 flags.DEFINE_bool("high_res", False, "Save high-res video and goal")
+flags.DEFINE_string("ip", "localhost", "IP address of the robot")
+flags.DEFINE_integer("port", 5556, "Port of the robot")
 
 STEP_DURATION = 0.2
 NO_PITCH_ROLL = False
@@ -124,9 +126,16 @@ def main(_):
         "catch_environment_except": False,
         "start_state": start_state,
         "return_full_image": FLAGS.high_res,
-        "camera_topics": [IMTopic("/D435/color/image_raw", flip=True)],
+        "camera_topics": [{"name": "/D435/color/image_raw", "flip": True}],
     }
-    env = BridgeDataRailRLPrivateWidowX(env_params, fixed_image_size=128)
+    
+    # init environment
+    widowx_client = WidowXClient(host=FLAGS.ip, port=FLAGS.port)
+    widowx_client.init(env_params)
+    
+    while widowx_client.get_observation() is None:
+        print("Waiting for environment to start...")
+        time.sleep(1)
 
     # load image goal
     image_goal = None
@@ -149,17 +158,23 @@ def main(_):
                 low_bound = [0.24, -0.1, 0.05, -1.57, 0]
                 high_bound = [0.4, 0.20, 0.15, 1.57, 0]
                 goal_eep = np.random.uniform(low_bound[:3], high_bound[:3])
-            env.controller().open_gripper(True)
+            widowx_client.move_gripper(1.0) # open gripper
             try:
-                env.controller().move_to_state(goal_eep, 0, duration=1.5)
+                widowx_client.move(goal_eep, 0, duration=1.5)
             except Exception as e:
                 continue
             input("Press [Enter] when ready for taking the goal image. ")
-            obs = env.current_obs()
+
+            obs = widowx_client.get_observation()
+            while obs is None:
+                print("WARNING retrying to get observation...")
+                obs = widowx_client.get_observation()
+                time.sleep(1)
+
             image_goal = (
                 obs["image"].reshape(3, 128, 128).transpose(1, 2, 0) * 255
             ).astype(np.uint8)
-            full_goal_image = obs["full_image"][0]
+            full_goal_image = obs["full_image"]
 
         # ask for which policy to use
         if len(policies) == 1:
@@ -173,15 +188,16 @@ def main(_):
 
         policy_name = list(policies.keys())[policy_idx]
         agent, action_mean, action_std = policies[policy_name]
-        try:
-            env.reset()
-            env.start()
-        except Exception as e:
-            continue
+        # reset env
+        widowx_client.reset()
+        time.sleep(2.5)
 
         # move to initial position
         try:
             if FLAGS.initial_eep is not None:
+                # TODO: (YL) : this is bad, since initial eep is not defined clearly
+                assert False, "Not implemented"
+
                 assert isinstance(FLAGS.initial_eep, list)
                 initial_eep = [float(e) for e in FLAGS.initial_eep]
                 env.controller().move_to_state(initial_eep, 0, duration=1.5)
@@ -190,7 +206,6 @@ def main(_):
 
         # do rollout
         rng = jax.random.PRNGKey(0)
-        obs = env.current_obs()
         last_tstep = time.time()
         images = []
         full_images = []
@@ -201,11 +216,17 @@ def main(_):
         try:
             while t < FLAGS.num_timesteps:
                 if time.time() > last_tstep + STEP_DURATION or FLAGS.blocking:
+                    
+                    obs = widowx_client.get_observation()
+                    if obs is None:
+                        print("WARNING retrying to get observation...")
+                        continue
+
                     image_obs = (
                         obs["image"].reshape(3, 128, 128).transpose(1, 2, 0) * 255
                     ).astype(np.uint8)
                     if FLAGS.high_res:
-                        full_images.append(Image.fromarray(obs["full_image"][0]))
+                        full_images.append(Image.fromarray(obs["full_image"]))
                     obs = {"image": image_obs, "proprio": obs["state"]}
                     goal_obs = {
                         "image": image_goal,
@@ -243,9 +264,14 @@ def main(_):
                         action[5] = 0
 
                     # perform environment step
-                    obs, rew, done, info = env.step(
-                        action, last_tstep + STEP_DURATION, blocking=FLAGS.blocking
-                    )
+                    # obs, rew, done, info = env.step(
+                    #     action, last_tstep + STEP_DURATION, blocking=FLAGS.blocking
+                    # )
+                    print(action)
+                    assert False, "Not implemented"
+
+                    widowx_client.move(action[:6], duration=STEP_DURATION)
+                    widowx_client.move_gripper(action[-1])
 
                     # save image
                     image_formatted = np.concatenate((image_goal, image_obs), axis=0)
