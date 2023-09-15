@@ -11,10 +11,12 @@ import matplotlib
 from absl import app, flags, logging
 matplotlib.use("Agg")
 
+import cv2
 import numpy as np
 import tensorflow as tf
 
 import jax
+from pyquaternion import Quaternion
 from PIL import Image
 
 from flax.training import checkpoints
@@ -22,8 +24,9 @@ from jaxrl_m.vision import encoders
 from jaxrl_m.agents import agents
 
 # bridge_data_robot imports
-from widowx_envs.widowx_env_service import WidowXClient
+from widowx_envs.widowx_env_service import WidowXClient, WidowXConfigs
 
+##############################################################################
 
 np.set_printoptions(suppress=True)
 
@@ -47,12 +50,44 @@ flags.DEFINE_bool("high_res", False, "Save high-res video and goal")
 flags.DEFINE_string("ip", "localhost", "IP address of the robot")
 flags.DEFINE_integer("port", 5556, "Port of the robot")
 
+# show image flag
+flags.DEFINE_bool("show_image", False, "Show image")
+
 STEP_DURATION = 0.2
 NO_PITCH_ROLL = False
 NO_YAW = False
 STICKY_GRIPPER_NUM_STEPS = 1
 
 FIXED_STD = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
+##############################################################################
+
+def state_to_eep(xyz_coor, zangle: float):
+    """
+    Implement the state to eep function.
+    Refered to `bridge_data_robot`'s `widowx_controller/widowx_controller.py`
+    return a 4x4 matrix
+    """
+    assert len(xyz_coor) == 3
+    DEFAULT_ROTATION = np.array([[0 , 0, 1.0],
+                             [0, 1.0,  0],
+                             [-1.0,  0, 0]])
+    new_pose = np.eye(4)
+    new_pose[:3, -1] = xyz_coor
+    new_quat = Quaternion(axis=np.array([0.0, 0.0, 1.0]), angle=zangle) \
+        * Quaternion(matrix=DEFAULT_ROTATION)
+    new_pose[:3, :3] = new_quat.rotation_matrix
+    # yaw, pitch, roll = quat.yaw_pitch_roll
+    return new_pose
+
+
+def mat_to_xyzrpy(mat: np.ndarray):
+    """return a 6-dim vector with xyz and rpy"""
+    assert mat.shape == (4, 4), "mat must be a 4x4 matrix"
+    xyz = mat[:3, -1]
+    quat = Quaternion(matrix=mat[:3, :3])
+    yaw, pitch, roll = quat.yaw_pitch_roll
+    return np.concatenate([xyz, [roll, pitch, yaw]])
 
 
 def unnormalize_action(action, mean, std):
@@ -111,28 +146,10 @@ def main(_):
     else:
         start_state = None
 
-    # set up environment
-    env_params = {
-        "fix_zangle": 0.1,
-        "move_duration": 0.2,
-        "adaptive_wait": True,
-        "move_to_rand_start_freq": 1,
-        "override_workspace_boundaries": [
-            [0.1, -0.15, -0.1, -1.57, 0],
-            [0.45, 0.25, 0.18, 1.57, 0],
-        ],
-        "action_clipping": "xyz",
-        # "action_clipping": None,
-        "catch_environment_except": False,
-        "start_state": start_state,
-        "return_full_image": FLAGS.high_res,
-        "camera_topics": [{"name": "/D435/color/image_raw", "flip": True}],
-    }
-    
     # init environment
     widowx_client = WidowXClient(host=FLAGS.ip, port=FLAGS.port)
-    widowx_client.init(env_params)
-    
+    widowx_client.init(WidowXConfigs.DefaultEnvParams) # use default params
+
     while widowx_client.get_observation() is None:
         print("Waiting for environment to start...")
         time.sleep(1)
@@ -158,11 +175,11 @@ def main(_):
                 low_bound = [0.24, -0.1, 0.05, -1.57, 0]
                 high_bound = [0.4, 0.20, 0.15, 1.57, 0]
                 goal_eep = np.random.uniform(low_bound[:3], high_bound[:3])
-            widowx_client.move_gripper(1.0) # open gripper
-            try:
-                widowx_client.move(goal_eep, 0, duration=1.5)
-            except Exception as e:
-                continue
+            widowx_client.move_gripper(1.0) # open gripper           
+
+            goal_eep = state_to_eep(goal_eep, 0)
+            widowx_client.move(goal_eep)
+            time.sleep(1.5)
             input("Press [Enter] when ready for taking the goal image. ")
 
             obs = widowx_client.get_observation()
@@ -195,12 +212,11 @@ def main(_):
         # move to initial position
         try:
             if FLAGS.initial_eep is not None:
-                # TODO: (YL) : this is bad, since initial eep is not defined clearly
-                assert False, "Not implemented"
-
                 assert isinstance(FLAGS.initial_eep, list)
                 initial_eep = [float(e) for e in FLAGS.initial_eep]
-                env.controller().move_to_state(initial_eep, 0, duration=1.5)
+                eep = state_to_eep(initial_eep, 0)
+                widowx_client.move(eep)
+                time.sleep(1.5)
         except Exception as e:
             continue
 
@@ -222,6 +238,10 @@ def main(_):
                         print("WARNING retrying to get observation...")
                         continue
 
+                    if FLAGS.show_image:
+                        cv2.imshow("img_view", obs["full_image"])
+                        cv2.waitKey(10)
+
                     image_obs = (
                         obs["image"].reshape(3, 128, 128).transpose(1, 2, 0) * 255
                     ).astype(np.uint8)
@@ -233,7 +253,6 @@ def main(_):
                     }
 
                     last_tstep = time.time()
-
                     rng, key = jax.random.split(rng)
                     action = np.array(
                         agent.sample_actions(obs, goal_obs, seed=key, argmax=True)
@@ -263,15 +282,9 @@ def main(_):
                     if NO_YAW:
                         action[5] = 0
 
-                    # perform environment step
-                    # obs, rew, done, info = env.step(
-                    #     action, last_tstep + STEP_DURATION, blocking=FLAGS.blocking
-                    # )
-                    print(action)
-                    assert False, "Not implemented"
-
-                    widowx_client.move(action[:6], duration=STEP_DURATION)
-                    widowx_client.move_gripper(action[-1])
+                    print(f"timestep {t}, calling step action {action}")
+                    widowx_client.step_action(action)
+                    # time.sleep(STEP_DURATION)
 
                     # save image
                     image_formatted = np.concatenate((image_goal, image_obs), axis=0)
