@@ -24,7 +24,8 @@ from jaxrl_m.vision import encoders
 from jaxrl_m.agents import agents
 
 # bridge_data_robot imports
-from widowx_envs.widowx_env_service import WidowXClient, WidowXConfigs
+from widowx_envs.widowx_env_service import WidowXClient, WidowXConfigs, WidowXStatus
+
 
 ##############################################################################
 
@@ -148,7 +149,7 @@ def main(_):
 
     # init environment
     widowx_client = WidowXClient(host=FLAGS.ip, port=FLAGS.port)
-    widowx_client.init(WidowXConfigs.DefaultEnvParams) # use default params
+    widowx_client.init(WidowXConfigs.DefaultEnvParams, image_size=256)
 
     while widowx_client.get_observation() is None:
         print("Waiting for environment to start...")
@@ -177,8 +178,12 @@ def main(_):
                 goal_eep = np.random.uniform(low_bound[:3], high_bound[:3])
             widowx_client.move_gripper(1.0) # open gripper           
 
+            # retry move action until success
             goal_eep = state_to_eep(goal_eep, 0)
-            widowx_client.move(goal_eep)
+            move_status = None
+            while move_status != WidowXStatus.SUCCESS:
+                move_status = widowx_client.move(goal_eep)
+
             time.sleep(1.5)
             input("Press [Enter] when ready for taking the goal image. ")
 
@@ -215,7 +220,11 @@ def main(_):
                 assert isinstance(FLAGS.initial_eep, list)
                 initial_eep = [float(e) for e in FLAGS.initial_eep]
                 eep = state_to_eep(initial_eep, 0)
-                widowx_client.move(eep)
+                
+                # retry move action until success
+                move_status = None
+                while move_status != WidowXStatus.SUCCESS:
+                    move_status = widowx_client.move(eep)
                 time.sleep(1.5)
         except Exception as e:
             continue
