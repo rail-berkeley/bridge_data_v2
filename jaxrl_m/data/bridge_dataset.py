@@ -6,13 +6,13 @@ below for more details.
 Written by Kevin Black (kvablack@berkeley.edu).
 """
 
-from typing import Iterator, List, Union, Optional, Iterable
 import fnmatch
+from typing import Iterable, List, Optional, Union
 
 import numpy as np
-from absl import logging
-from flax.core import FrozenDict
 import tensorflow as tf
+from absl import logging
+
 from jaxrl_m.data.tf_augmentations import augment
 from jaxrl_m.data.tf_goal_relabeling import GOAL_RELABELING_FUNCTIONS
 
@@ -98,8 +98,10 @@ class BridgeDataset:
             is provided, the data will be sampled from each sub-list according
             to "sample_weights".
         seed: Random seed.
-        action_metadata: Dictionary containing metadata (mean and standard
-            deviation) of the actions. If provided, actions will be normalized.
+        action_proprio_metadata: Dictionary containing metadata of the actions and proprio.
+            If provided, actions and proprio will be normalized.
+        normalization_type: The type of normalization to apply to the actions
+            and proprio.
         relabel_actions: Whether to relabel the actions with reached states
             (based on proprioception). Also binarizes gripper actions.
         goal_relabeling_strategy: Goal relabeling strategy. See
@@ -111,31 +113,32 @@ class BridgeDataset:
         batch_size: Batch size.
         shuffle_buffer_size: Size of the shuffle buffer. It is split between
             sub-datasets by `sample_weights`.
-        prefetch_num_batches: Number of batches to prefetch.
         cache: Whether to cache the dataset in memory.
         train: Whether this dataset is intended for training
             (if set to `False`, will disable shuffling and augmentations).
         augment: Whether to apply image augmentations.
-        augment_next_obs_goal_differently: Whether to use different random seeds
-            for augmenting the obs, next_obs, and goal image.
         augment_kwargs: Keyword arguments for image augmentations. See
             `jaxrl_m.data.tf_augmentations.augment` for more details.
+        augment_next_obs_goal_differently: Whether to use different random seeds
+            for augmenting the obs, next_obs, and goal image.
         act_pred_horizon: Number of consecutive actions that will be predicted.
         obs_horizon: Number of consecutive observations that will be conditioned on.
+        load_langauge: Whether to look for and load language from the data.
+        skip_unlabeled: Whether to filter out trajectories not labeled with language.
     """
 
     def __init__(
         self,
         data_paths: List[Union[str, List[str]]],
         seed: int,
-        action_metadata: Optional[dict] = None,
+        action_proprio_metadata: Optional[dict] = None,
+        normalization_type: Optional[str] = "normal",
         relabel_actions: bool = True,
         goal_relabeling_strategy: str = "uniform",
         goal_relabeling_kwargs: dict = {},
         sample_weights: Optional[List[float]] = None,
         batch_size: int = 256,
         shuffle_buffer_size: int = 10000,
-        prefetch_num_batches: int = 5,
         cache: bool = False,
         train: bool = True,
         augment: bool = False,
@@ -143,6 +146,8 @@ class BridgeDataset:
         augment_kwargs: dict = {},
         act_pred_horizon: Optional[int] = None,
         obs_horizon: Optional[int] = None,
+        load_language: bool = False,
+        skip_unlabeled: bool = False,
         **kwargs,
     ):
         logging.warning("Extra kwargs passed to BridgeDataset: %s", kwargs)
@@ -155,7 +160,8 @@ class BridgeDataset:
         assert np.isclose(sum(sample_weights), 1.0)
 
         self.relabel_actions = relabel_actions
-        self.action_metadata = action_metadata
+        self.action_proprio_metadata = action_proprio_metadata
+        self.normalization_type = normalization_type
         self.goal_relabeling_strategy = goal_relabeling_strategy
         self.goal_relabeling_kwargs = goal_relabeling_kwargs
         self.cache = cache
@@ -163,6 +169,11 @@ class BridgeDataset:
         self.augment_next_obs_goal_differently = augment_next_obs_goal_differently
         self.act_pred_horizon = act_pred_horizon
         self.obs_horizon = obs_horizon
+        self.is_train = train
+        self.load_language = load_language
+
+        if self.load_language:
+            self.PROTO_TYPE_SPEC["language"] = tf.string
 
         # construct a dataset for each sub-list of paths
         datasets = []
@@ -187,6 +198,11 @@ class BridgeDataset:
             datasets, sample_weights, seed=seed, stop_on_empty_dataset=train
         )
 
+        if skip_unlabeled:
+            dataset = dataset.filter(
+                lambda x: tf.math.reduce_any(x["goals"]["language"] != "")
+            )
+
         if train and augment:
             # apply augmentations, using a sequence of integers as seeds.
             # this was the only way I found to avoid a memory leak in tf.random.Generator
@@ -200,9 +216,6 @@ class BridgeDataset:
             deterministic=not train,
         )
 
-        # always prefetch at the end of the pipeline
-        dataset = dataset.prefetch(prefetch_num_batches)
-
         self.tf_dataset = dataset
 
     def _construct_tf_dataset(self, paths: List[str], seed: int) -> tf.data.Dataset:
@@ -210,6 +223,7 @@ class BridgeDataset:
         Constructs a tf.data.Dataset from a list of paths.
         The dataset yields a dictionary of tensors for each transition.
         """
+
         # shuffle again using the dataset API so the files are read in a
         # different order every epoch
         dataset = tf.data.Dataset.from_tensor_slices(paths).shuffle(len(paths), seed)
@@ -262,7 +276,6 @@ class BridgeDataset:
             key: tf.io.parse_tensor(parsed_features[key], dtype)
             for key, dtype in self.PROTO_TYPE_SPEC.items()
         }
-
         # restructure the dictionary into the downstream format
         return {
             "observations": {
@@ -273,6 +286,7 @@ class BridgeDataset:
                 "image": parsed_tensors["next_observations/images0"],
                 "proprio": parsed_tensors["next_observations/state"],
             },
+            **({"language": parsed_tensors["language"]} if self.load_language else {}),
             "actions": parsed_tensors["actions"],
             "terminals": parsed_tensors["terminals"],
             "truncates": parsed_tensors["truncates"],
@@ -293,15 +307,42 @@ class BridgeDataset:
             )
 
             traj["actions"] = tf.concat(
-                [movement_actions, binarized_gripper_actions[:, None]],
-                axis=1,
+                [movement_actions, binarized_gripper_actions[:, None]], axis=1
             )
 
-        # normalize actions
-        if self.action_metadata is not None:
-            traj["actions"] = (
-                traj["actions"] - self.action_metadata["mean"]
-            ) / self.action_metadata["std"]
+        # normalize actions and proprio
+        if self.action_proprio_metadata is not None:
+            if self.normalization_type == "normal":
+                # normalize to mean 0, std 1
+                traj["actions"] = (
+                    traj["actions"] - self.action_proprio_metadata["action"]["mean"]
+                ) / self.action_proprio_metadata["action"]["std"]
+                for key in ["observations", "next_observations"]:
+                    traj[key]["proprio"] = (
+                        traj[key]["proprio"]
+                        - self.action_proprio_metadata["proprio"]["mean"]
+                    ) / self.action_proprio_metadata["proprio"]["std"]
+            elif self.normalization_type == "bounds":
+                # normalize to [0, 1]
+                traj["actions"] = (
+                    traj["actions"] - self.action_proprio_metadata["action"]["min"]
+                ) / (
+                    self.action_proprio_metadata["action"]["max"]
+                    - self.action_proprio_metadata["action"]["min"]
+                )
+                # clip to [0, 1]
+                traj["actions"] = tf.clip_by_value(traj["actions"], 0, 1)
+                for key in ["observations", "next_observations"]:
+                    traj[key]["proprio"] = (
+                        traj[key]["proprio"]
+                        - self.action_proprio_metadata["proprio"]["min"]
+                    ) / (
+                        self.action_proprio_metadata["proprio"]["max"]
+                        - self.action_proprio_metadata["proprio"]["min"]
+                    )
+                    traj[key]["proprio"] = tf.clip_by_value(traj[key]["proprio"], 0, 1)
+            else:
+                raise ValueError
 
         return traj
 
@@ -337,6 +378,16 @@ class BridgeDataset:
             traj, **self.goal_relabeling_kwargs
         )
 
+        if self.load_language:
+            lang_idx = tf.random.uniform(
+                shape=[], maxval=len(traj["language"]), dtype=tf.int32
+            )
+            lang = traj["language"][lang_idx]
+            traj["goals"]["language"] = tf.broadcast_to(
+                lang, tf.shape(traj["terminals"])
+            )
+            traj.pop("language")
+
         # after goal relabeling, we can set actions and obs to chunked version
         if "action_chunks" in traj:
             traj["actions"] = traj.pop("action_chunks")
@@ -365,8 +416,5 @@ class BridgeDataset:
             )
         return image
 
-    def get_iterator(self) -> Iterator[FrozenDict]:
-        # yield FrozenDicts. this can be bypassed by using
-        # `dataset.tf_dataset.as_numpy_iterator()` instead
-        iterator = map(FrozenDict, self.tf_dataset.as_numpy_iterator())
-        return iterator
+    def iterator(self):
+        return self.tf_dataset.prefetch(tf.data.AUTOTUNE).as_numpy_iterator()

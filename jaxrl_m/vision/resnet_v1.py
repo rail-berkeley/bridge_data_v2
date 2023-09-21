@@ -1,14 +1,12 @@
 import functools as ft
+from functools import partial
+from typing import Any, Callable, Sequence, Tuple
+
 import flax.linen as nn
 import jax.numpy as jnp
-
-from functools import partial
-from typing import Any
-from typing import Callable
-from typing import Sequence
-from typing import Tuple
-
 import numpy as np
+
+from jaxrl_m.vision.film_conditioning_layer import FilmConditioning
 
 ModuleDef = Any
 
@@ -24,7 +22,7 @@ class AddSpatialCoordinates(nn.Module):
                 axis=-1,
             ),
             dtype=self.dtype,
-        )
+        ).transpose(1, 0, 2)
 
         if x.ndim == 4:
             grid = jnp.broadcast_to(grid, [x.shape[0], *grid.shape])
@@ -137,10 +135,7 @@ class ResNetBlock(nn.Module):
     strides: Tuple[int, int] = (1, 1)
 
     @nn.compact
-    def __call__(
-        self,
-        x,
-    ):
+    def __call__(self, x):
         residual = x
         y = self.conv(self.filters, (3, 3), self.strides)(x)
         y = self.norm()(y)
@@ -203,6 +198,7 @@ class ResNetEncoder(nn.Module):
     softmax_temperature: float = 1.0
     use_multiplicative_cond: bool = False
     num_spatial_blocks: int = 8
+    use_film: bool = False
 
     @nn.compact
     def __call__(self, observations: jnp.ndarray, train: bool = True, cond_var=None):
@@ -219,26 +215,18 @@ class ResNetEncoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
         )
         if self.norm == "batch":
-            raise NotImplementedError()
+            raise NotImplementedError
         elif self.norm == "group":
             norm = partial(MyGroupNorm, num_groups=4, epsilon=1e-5, dtype=self.dtype)
         elif self.norm == "layer":
-            norm = partial(
-                nn.LayerNorm,
-                epsilon=1e-5,
-                dtype=self.dtype,
-            )
+            norm = partial(nn.LayerNorm, epsilon=1e-5, dtype=self.dtype)
         else:
             raise ValueError("norm not found")
 
         act = getattr(nn, self.act)
 
         x = conv(
-            self.num_filters,
-            (7, 7),
-            (2, 2),
-            padding=[(3, 3), (3, 3)],
-            name="conv_init",
+            self.num_filters, (7, 7), (2, 2), padding=[(3, 3), (3, 3)], name="conv_init"
         )(x)
 
         x = norm(name="norm_init")(x)
@@ -248,12 +236,17 @@ class ResNetEncoder(nn.Module):
             for j in range(block_size):
                 stride = (2, 2) if i > 0 and j == 0 else (1, 1)
                 x = self.block_cls(
-                    self.num_filters * 2**i,
+                    self.num_filters * 2 ** i,
                     strides=stride,
                     conv=conv,
                     norm=norm,
                     act=act,
                 )(x)
+                if self.use_film:
+                    assert (
+                        cond_var is not None
+                    ), "Cond var is None, nothing to condition on"
+                    x = FilmConditioning()(x, cond_var)
                 if self.use_multiplicative_cond:
                     assert (
                         cond_var is not None
@@ -286,6 +279,8 @@ class ResNetEncoder(nn.Module):
             x = jnp.mean(x, axis=(-3, -2))
         elif self.pooling_method == "max":
             x = jnp.max(x, axis=(-3, -2))
+        elif self.pooling_method == "none":
+            pass
         else:
             raise ValueError("pooling method not found")
 
@@ -320,10 +315,24 @@ resnetv1_configs = {
         block_cls=ResNetBlock,
         num_spatial_blocks=8,
     ),
+    "resnetv1-34-bridge-film": ft.partial(
+        ResNetEncoder,
+        stage_sizes=(3, 4, 6, 3),
+        block_cls=ResNetBlock,
+        num_spatial_blocks=8,
+        use_film=True,
+    ),
     "resnetv1-50-bridge": ft.partial(
         ResNetEncoder,
         stage_sizes=(3, 4, 6, 3),
         block_cls=BottleneckResNetBlock,
         num_spatial_blocks=8,
+    ),
+    "resnetv1-50-bridge-film": ft.partial(
+        ResNetEncoder,
+        stage_sizes=(3, 4, 6, 3),
+        block_cls=BottleneckResNetBlock,
+        num_spatial_blocks=8,
+        use_film=True,
     ),
 }

@@ -8,8 +8,7 @@ We provide implementations for the following subset of methods described in the 
 - Goal-conditioned BC with a diffusion policy 
 - Goal-condtioned IQL
 - Goal-conditioned contrastive RL 
-
-The code for the language-conditioned BC method may be released soon.
+- Language-conditioned BC
 
 The official implementations and papers for all the methods can be found here:
 - [IQDL](https://github.com/philippe-eecs/IDQL) (IQL + diffusion policy) [[Hansen-Estruch et al.](https://github.com/philippe-eecs/IDQL)] and [Diffusion Policy](https://diffusion-policy.cs.columbia.edu/) [[Chi et al.](https://diffusion-policy.cs.columbia.edu/)]
@@ -23,6 +22,8 @@ Please open a GitHub issue if you encounter problems with this code.
 ## Data 
 
 The raw dataset (comprised of JPEGs, PNGs, and pkl files) can be downloaded from the [website](https://rail-berkeley.github.io/bridgedata/). For training, the raw data needs to be converted into a TFRecord format that is compatible with the data loader. First, use `data_processing/bridgedata_raw_to_numpy.py` to convert the raw data into numpy files. Then, use `data_processing/bridgedata_numpy_to_tfrecord.py` to convert the numpy files into TFRecord files. 
+
+We plan to release a pre-processed [TFDS](https://www.tensorflow.org/datasets/catalog/overview) version of the data in the [RLDS](https://github.com/google-research/rlds) format soon.
 
 ## Training
 
@@ -42,23 +43,26 @@ Training hyperparameters can be modified in `experiments/configs/data_config.py`
 First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https://github.com/rail-berkeley/bridge_data_robot). Then, run the command:
 
 ```
-python experiments/eval.py \
+python experiments/eval_gc.py \
     --num_timesteps NUM_TIMESTEPS \
     --video_save_path VIDEO_DIR \
     --checkpoint_weights_path CHECKPOINT_WEIGHTS_PATH \
     --checkpoint_config_path CHECKPOINT_CONFIG_PATH \
+    --im_size IMAGE_SIZE
     --blocking
 ```
 
-The script loads some information about the checkpoint from its corresponding WandB run.
+You can also specify an initial position for the end effector with the flag `--initial_eep`. Similarly, use the flag `--goal_eep` to specify the position of the end effector when taking the goal image.
+
+To evaluate language-conditioned BC, replace `eval_gc.py` with `eval_lc.py` in the above command.
 
 ## Provided Checkpoints
 
-Checkpoints for GCBC, D-GCBC, GCIQL, CRL, and RT-1 are available [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/checkpoints/). Each checkpoint (except RT-1) has an associated JSON file with its configuration information. To evaluate these checkpoints with the above evaluation script, modify the references to the wandb run configuration to use the dictionary provided in the JSON file instead.
+Checkpoints for GCBC, LCBC, D-GCBC, GCIQL, CRL, and RT-1 are available [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/checkpoints/). Each checkpoint (except RT-1) has an associated JSON file with its configuration information. The name of each checkpoint indicates whether it was trained with 128x128 images or 256x256 images.
 
 An evaluation script for the RT-1 checkpoint is available in this separate repo (TODO).
 
-We don't currently have checkpoints for ACT or LCBC available but may release them soon. 
+We don't currently have a checkpoint for ACT available but may release one soon. 
 
 ## Environment
 
