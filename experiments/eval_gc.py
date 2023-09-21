@@ -37,11 +37,7 @@ flags.DEFINE_multi_string(
 )
 flags.DEFINE_integer("im_size", None, "Image size", required=True)
 flags.DEFINE_string("video_save_path", None, "Path to save video")
-flags.DEFINE_string(
-    "goal_image_path",
-    None,
-    "Path to a single goal image",
-)
+flags.DEFINE_string("goal_image_path", None, "Path to a single goal image")
 flags.DEFINE_integer("num_timesteps", 120, "num timesteps")
 flags.DEFINE_bool("blocking", False, "Use the blocking controller")
 flags.DEFINE_spaceseplist("goal_eep", None, "Goal position")
@@ -97,7 +93,7 @@ def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
     example_batch = {
         "observations": example_obs,
         "goals": {
-            "image": np.zeros((1, FLAGS.im_size, FLAGS.im_size, 3), dtype=np.uint8),
+            "image": np.zeros((1, FLAGS.im_size, FLAGS.im_size, 3), dtype=np.uint8)
         },
         "actions": example_actions,
     }
@@ -254,9 +250,7 @@ def main(_):
                         * 255
                     ).astype(np.uint8)
                     obs = {"image": image_obs, "proprio": obs["state"]}
-                    goal_obs = {
-                        "image": image_goal,
-                    }
+                    goal_obs = {"image": image_goal}
                     if obs_horizon is not None:
                         if len(obs_hist) == 0:
                             obs_hist.extend([obs] * obs_horizon)
@@ -317,11 +311,7 @@ def main(_):
                 f"{curr_time}_{policy_name}_sticky_{STICKY_GRIPPER_NUM_STEPS}.mp4",
             )
             video = np.concatenate([np.stack(goals), np.stack(images)], axis=1)
-            imageio.mimsave(
-                save_path,
-                video,
-                fps=1.0 / STEP_DURATION * 3,
-            )
+            imageio.mimsave(save_path, video, fps=1.0 / STEP_DURATION * 3)
 
 
 if __name__ == "__main__":

@@ -51,6 +51,6 @@ def get_config(config_string):
                 "sample_weights": None,
                 "action_proprio_metadata": ACTION_PROPRIO_METADATA,
             }
-        ),
+        )
     }
     return possible_structures[config_string]

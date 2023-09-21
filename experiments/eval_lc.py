@@ -90,15 +90,7 @@ def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
 
     example_batch = {
         "observations": example_obs,
-        "goals": {
-            "language": np.zeros(
-                (
-                    1,
-                    512,
-                ),
-                dtype=np.float32,
-            ),
-        },
+        "goals": {"language": np.zeros((1, 512), dtype=np.float32)},
         "actions": example_actions,
     }
 
@@ -236,9 +228,7 @@ def main(_):
                         * 255
                     ).astype(np.uint8)
                     obs = {"image": image_obs, "proprio": obs["state"]}
-                    goal_obs = {
-                        "language": instruction,
-                    }
+                    goal_obs = {"language": instruction}
                     if obs_horizon is not None:
                         if len(obs_hist) == 0:
                             obs_hist.extend([obs] * obs_horizon)
@@ -297,11 +287,7 @@ def main(_):
                 FLAGS.video_save_path,
                 f"{curr_time}_{policy_name}_sticky_{STICKY_GRIPPER_NUM_STEPS}.mp4",
             )
-            imageio.mimsave(
-                save_path,
-                images,
-                fps=1.0 / STEP_DURATION * 3,
-            )
+            imageio.mimsave(save_path, images, fps=1.0 / STEP_DURATION * 3)
 
 
 if __name__ == "__main__":

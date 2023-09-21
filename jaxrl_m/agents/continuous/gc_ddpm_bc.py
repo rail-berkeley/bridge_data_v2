@@ -27,10 +27,10 @@ from jaxrl_m.networks.mlp import MLP, MLPResNet
 def ddpm_bc_loss(noise_prediction, noise):
     ddpm_loss = jnp.square(noise_prediction - noise).sum(-1)
 
-    return ddpm_loss.mean(), {
-        "ddpm_loss": ddpm_loss,
-        "ddpm_loss_mean": ddpm_loss.mean(),
-    }
+    return (
+        ddpm_loss.mean(),
+        {"ddpm_loss": ddpm_loss, "ddpm_loss_mean": ddpm_loss.mean()},
+    )
 
 
 class GCDDPMBCAgent(flax.struct.PyTreeNode):
@@ -72,14 +72,9 @@ class GCDDPMBCAgent(flax.struct.PyTreeNode):
                 name="actor",
             )
 
-            return ddpm_bc_loss(
-                noise_pred,
-                noise_sample,
-            )
+            return ddpm_bc_loss(noise_pred, noise_sample)
 
-        loss_fns = {
-            "actor": actor_loss_fn,
-        }
+        loss_fns = {"actor": actor_loss_fn}
 
         # compute gradients and update params
         new_state, info = self.state.apply_loss_fns(
@@ -126,10 +121,7 @@ class GCDDPMBCAgent(flax.struct.PyTreeNode):
             current_x = alpha_1 * (current_x - alpha_2 * eps_pred)
 
             rng, key = jax.random.split(rng)
-            z = jax.random.normal(
-                key,
-                shape=current_x.shape,
-            )
+            z = jax.random.normal(key, shape=current_x.shape)
             z_scaled = temperature * z
             current_x = current_x + (time > 0) * (
                 jnp.sqrt(self.config["betas"][time]) * z_scaled
@@ -174,9 +166,7 @@ class GCDDPMBCAgent(flax.struct.PyTreeNode):
             observations=batch["observations"], goals=batch["goals"], seed=seed
         )
 
-        metrics = {
-            "mse": ((actions - batch["actions"]) ** 2).sum((-2, -1)).mean(),
-        }
+        metrics = {"mse": ((actions - batch["actions"]) ** 2).sum((-2, -1)).mean()}
 
         return metrics
 
@@ -245,7 +235,7 @@ class GCDDPMBCAgent(flax.struct.PyTreeNode):
                     dropout_rate=score_network_kwargs["dropout_rate"],
                     use_layer_norm=score_network_kwargs["use_layer_norm"],
                 ),
-            ),
+            )
         }
 
         model_def = ModuleDict(networks)
@@ -267,9 +257,7 @@ class GCDDPMBCAgent(flax.struct.PyTreeNode):
             decay_steps=warmup_steps + 1,
             end_value=learning_rate,
         )
-        lr_schedules = {
-            "actor": lr_schedule,
-        }
+        lr_schedules = {"actor": lr_schedule}
         if actor_decay_steps is not None:
             lr_schedules["actor"] = optax.warmup_cosine_decay_schedule(
                 init_value=0.0,

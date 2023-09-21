@@ -38,14 +38,17 @@ class BCAgent(flax.struct.PyTreeNode):
             actor_loss = -(log_probs).mean()
             actor_std = dist.stddev().mean(axis=1)
 
-            return actor_loss, {
-                "actor_loss": actor_loss,
-                "mse": mse.mean(),
-                "log_probs": log_probs,
-                "pi_actions": pi_actions,
-                "mean_std": actor_std.mean(),
-                "max_std": actor_std.max(),
-            }
+            return (
+                actor_loss,
+                {
+                    "actor_loss": actor_loss,
+                    "mse": mse.mean(),
+                    "log_probs": log_probs,
+                    "pi_actions": pi_actions,
+                    "mean_std": actor_std.mean(),
+                    "max_std": actor_std.max(),
+                },
+            )
 
         # compute gradients and update params
         new_state, info = self.state.apply_loss_fns(
@@ -90,11 +93,7 @@ class BCAgent(flax.struct.PyTreeNode):
         log_probs = dist.log_prob(batch["actions"])
         mse = ((pi_actions - batch["actions"]) ** 2).sum(-1)
 
-        return {
-            "mse": mse,
-            "log_probs": log_probs,
-            "pi_actions": pi_actions,
-        }
+        return {"mse": mse, "log_probs": log_probs, "pi_actions": pi_actions}
 
     @classmethod
     def create(
@@ -105,9 +104,7 @@ class BCAgent(flax.struct.PyTreeNode):
         # Model architecture
         encoder_def: nn.Module,
         use_proprio: bool = False,
-        network_kwargs: dict = {
-            "hidden_dims": [256, 256],
-        },
+        network_kwargs: dict = {"hidden_dims": [256, 256]},
         policy_kwargs: dict = {
             "tanh_squash_distribution": False,
             "state_dependent_std": False,
@@ -119,9 +116,7 @@ class BCAgent(flax.struct.PyTreeNode):
         decay_steps: int = 1000000,
     ):
         encoder_def = EncodingWrapper(
-            encoder=encoder_def,
-            use_proprio=use_proprio,
-            stop_gradient=False,
+            encoder=encoder_def, use_proprio=use_proprio, stop_gradient=False
         )
 
         network_kwargs["activate_final"] = True

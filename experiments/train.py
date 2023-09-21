@@ -59,16 +59,9 @@ def main(_):
 
     # set up wandb and logging
     wandb_config = WandBLogger.get_default_config()
-    wandb_config.update(
-        {
-            "project": "jaxrl_m_bridgedata",
-            "exp_descriptor": FLAGS.name,
-        }
-    )
+    wandb_config.update({"project": "jaxrl_m_bridgedata", "exp_descriptor": FLAGS.name})
     wandb_logger = WandBLogger(
-        wandb_config=wandb_config,
-        variant=FLAGS.config.to_dict(),
-        debug=FLAGS.debug,
+        wandb_config=wandb_config, variant=FLAGS.config.to_dict(), debug=FLAGS.debug
     )
 
     save_dir = tf.io.gfile.join(

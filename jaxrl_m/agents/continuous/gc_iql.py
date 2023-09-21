@@ -248,10 +248,7 @@ class GCIQLAgent(flax.struct.PyTreeNode):
         early_goal_concat: bool = False,
         use_proprio: bool = False,
         negative_proportion: float = 0.0,
-        network_kwargs: dict = {
-            "hidden_dims": [256, 256],
-            "dropout": 0.0,
-        },
+        network_kwargs: dict = {"hidden_dims": [256, 256], "dropout": 0.0},
         policy_kwargs: dict = {
             "tanh_squash_distribution": False,
             "state_dependent_std": False,

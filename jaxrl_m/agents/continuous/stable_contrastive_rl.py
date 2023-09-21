@@ -144,14 +144,17 @@ class StableContrastiveRLAgent(flax.struct.PyTreeNode):
             logits_pos = jnp.sum(logits * I) / jnp.sum(I)
             logits_neg = jnp.sum(logits * (1 - I)) / jnp.sum(1 - I)
 
-            return critic_loss, {
-                "critic_loss": critic_loss,
-                "binary_accuracy": jnp.mean((logits > 0) == I),
-                "categorical_accuracy": jnp.mean(correct),
-                "logits_pos": logits_pos,
-                "logits_neg": logits_neg,
-                "logits": logits.mean(),
-            }
+            return (
+                critic_loss,
+                {
+                    "critic_loss": critic_loss,
+                    "binary_accuracy": jnp.mean((logits > 0) == I),
+                    "categorical_accuracy": jnp.mean(correct),
+                    "logits_pos": logits_pos,
+                    "logits_neg": logits_neg,
+                    "logits": logits.mean(),
+                },
+            )
 
         def actor_loss_fn(params, rng):
             rng, key = jax.random.split(rng)
@@ -193,20 +196,20 @@ class StableContrastiveRLAgent(flax.struct.PyTreeNode):
                 "gcbc_coef"
             ] * gcbc_loss
 
-            return actor_loss, {
-                "actor_loss": actor_loss,
-                "q_action_loss": q_action_loss,
-                "gcbc_loss": gcbc_loss,
-                "sampled_log_probs": sampled_log_probs.mean(),
-                "log_probs": log_probs.mean(),
-                "mse": mse.mean(),
-                "pi_std": pi_std.mean(),
-            }
+            return (
+                actor_loss,
+                {
+                    "actor_loss": actor_loss,
+                    "q_action_loss": q_action_loss,
+                    "gcbc_loss": gcbc_loss,
+                    "sampled_log_probs": sampled_log_probs.mean(),
+                    "log_probs": log_probs.mean(),
+                    "mse": mse.mean(),
+                    "pi_std": pi_std.mean(),
+                },
+            )
 
-        loss_fns = {
-            "critic": critic_loss_fn,
-            "actor": actor_loss_fn,
-        }
+        loss_fns = {"critic": critic_loss_fn, "actor": actor_loss_fn}
 
         # compute gradients and update params
         new_state, info = self.state.apply_loss_fns(
@@ -310,19 +313,9 @@ class StableContrastiveRLAgent(flax.struct.PyTreeNode):
         shared_goal_encoder: bool = True,
         early_goal_concat: bool = False,
         use_proprio: bool = False,
-        critic_network_kwargs: dict = {
-            "hidden_dims": [256, 256],
-            "dropout_rate": 0.0,
-        },
-        critic_kwargs: dict = {
-            "init_final": 1e-12,
-            "repr_dim": 16,
-            "twin_q": True,
-        },
-        policy_network_kwargs: dict = {
-            "hidden_dims": [256, 256],
-            "dropout_rate": 0.0,
-        },
+        critic_network_kwargs: dict = {"hidden_dims": [256, 256], "dropout_rate": 0.0},
+        critic_kwargs: dict = {"init_final": 1e-12, "repr_dim": 16, "twin_q": True},
+        policy_network_kwargs: dict = {"hidden_dims": [256, 256], "dropout_rate": 0.0},
         policy_kwargs: dict = {
             "tanh_squash_distribution": False,
             "state_dependent_std": False,
@@ -356,10 +349,7 @@ class StableContrastiveRLAgent(flax.struct.PyTreeNode):
         )
 
         if shared_encoder:
-            encoders = {
-                "actor": encoder_def,
-                "critic": encoder_def,
-            }
+            encoders = {"actor": encoder_def, "critic": encoder_def}
         else:
             # I (kvablack) don't think these deepcopies will break
             # shared_goal_encoder, but I haven't tested it.
@@ -414,10 +404,7 @@ class StableContrastiveRLAgent(flax.struct.PyTreeNode):
             decay_steps=warmup_steps + 1,
             end_value=learning_rate,
         )
-        lr_schedules = {
-            "actor": lr_schedule,
-            "critic": lr_schedule,
-        }
+        lr_schedules = {"actor": lr_schedule, "critic": lr_schedule}
         if actor_decay_steps is not None:
             lr_schedules["actor"] = optax.warmup_cosine_decay_schedule(
                 init_value=0.0,

@@ -21,24 +21,24 @@ import flax.linen as nn
 
 def expectile_loss(diff, expectile=0.5):
     weight = jnp.where(diff > 0, expectile, (1 - expectile))
-    return weight * (diff**2)
+    return weight * (diff ** 2)
 
 
 def iql_value_loss(q, v, expectile):
     value_loss = expectile_loss(q - v, expectile)
-    return value_loss.mean(), {
-        "value_loss": value_loss.mean(),
-        "uncentered_loss": jnp.mean((q - v) ** 2),
-        "v": v.mean(),
-    }
+    return (
+        value_loss.mean(),
+        {
+            "value_loss": value_loss.mean(),
+            "uncentered_loss": jnp.mean((q - v) ** 2),
+            "v": v.mean(),
+        },
+    )
 
 
 def iql_critic_loss(q, q_target):
     critic_loss = jnp.square(q - q_target)
-    return critic_loss.mean(), {
-        "td_loss": critic_loss.mean(),
-        "q": q.mean(),
-    }
+    return critic_loss.mean(), {"td_loss": critic_loss.mean(), "q": q.mean()}
 
 
 def iql_actor_loss(q, v, dist, actions, temperature=1.0, adv_clip_max=100.0, mask=None):
@@ -58,14 +58,17 @@ def iql_actor_loss(q, v, dist, actions, temperature=1.0, adv_clip_max=100.0, mas
 
     behavior_mse = jnp.square(dist.mode() - actions).sum(-1)
 
-    return actor_loss, {
-        "actor_loss": actor_loss,
-        "behavior_logprob": log_probs.mean(),
-        "behavior_mse": behavior_mse.mean(),
-        "adv_mean": adv.mean(),
-        "adv_max": adv.max(),
-        "adv_min": adv.min(),
-    }
+    return (
+        actor_loss,
+        {
+            "actor_loss": actor_loss,
+            "behavior_logprob": log_probs.mean(),
+            "behavior_mse": behavior_mse.mean(),
+            "adv_mean": adv.mean(),
+            "adv_max": adv.max(),
+            "adv_min": adv.min(),
+        },
+    )
 
 
 class IQLAgent(flax.struct.PyTreeNode):
@@ -245,9 +248,7 @@ class IQLAgent(flax.struct.PyTreeNode):
         encoder_def: nn.Module,
         shared_encoder: bool = True,
         use_proprio: bool = False,
-        network_kwargs: dict = {
-            "hidden_dims": [256, 256],
-        },
+        network_kwargs: dict = {"hidden_dims": [256, 256]},
         policy_kwargs: dict = {
             "tanh_squash_distribution": False,
             "state_dependent_std": False,
@@ -264,9 +265,7 @@ class IQLAgent(flax.struct.PyTreeNode):
         target_update_rate=0.002,
     ):
         encoder_def = EncodingWrapper(
-            encoder=encoder_def,
-            use_proprio=use_proprio,
-            stop_gradient=False,
+            encoder=encoder_def, use_proprio=use_proprio, stop_gradient=False
         )
 
         if shared_encoder:

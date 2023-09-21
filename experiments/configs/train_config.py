@@ -104,10 +104,7 @@ def get_config(config_string):
             dict(
                 agent="lc_bc",
                 agent_kwargs=dict(
-                    network_kwargs=dict(
-                        hidden_dims=(256, 256, 256),
-                        dropout_rate=0.1,
-                    ),
+                    network_kwargs=dict(hidden_dims=(256, 256, 256), dropout_rate=0.1),
                     policy_kwargs=dict(
                         tanh_squash_distribution=False,
                         fixed_std=[1, 1, 1, 1, 1, 1, 1],
@@ -132,9 +129,7 @@ def get_config(config_string):
                 text_processor_kwargs=dict(),
                 encoder="resnetv1-34-bridge-film",
                 encoder_kwargs=dict(
-                    pooling_method="avg",
-                    add_spatial_coordinates=True,
-                    act="swish",
+                    pooling_method="avg", add_spatial_coordinates=True, act="swish"
                 ),
                 **base_real_config,
             )
