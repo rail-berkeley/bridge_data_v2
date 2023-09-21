@@ -118,9 +118,7 @@ def main(_):
         )
 
     def process_text(batch):
-        if text_processor is None:
-            batch["goals"].pop("language")
-        else:
+        if text_processor is not None:
             batch["goals"]["language"] = text_processor.encode(
                 [s.decode("utf-8") for s in batch["goals"]["language"]]
             )

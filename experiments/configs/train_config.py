@@ -39,12 +39,11 @@ def get_config(config_string):
             dict(
                 agent="gc_iql",
                 agent_kwargs=dict(
-                    network_kwargs=dict(hidden_dims=(256, 256, 256)),
+                    network_kwargs=dict(hidden_dims=(256, 256, 256), dropout_rate=0.1),
                     policy_kwargs=dict(
                         tanh_squash_distribution=False,
                         state_dependent_std=False,
                         fixed_std=[1, 1, 1, 1, 1, 1, 1],
-                        dropout_rate=0.1,
                     ),
                     learning_rate=3e-4,
                     discount=0.98,
@@ -137,7 +136,7 @@ def get_config(config_string):
         "gc_ddpm_bc": ConfigDict(
             dict(
                 agent="gc_ddpm_bc",
-                obs_horizon=2,
+                obs_horizon=1,
                 agent_kwargs=dict(
                     score_network_kwargs=dict(
                         time_dim=32,
@@ -161,7 +160,7 @@ def get_config(config_string):
                     goal_relabeling_strategy="uniform",
                     goal_relabeling_kwargs=dict(reached_proportion=0.0),
                     relabel_actions=True,
-                    act_pred_horizon=4,
+                    act_pred_horizon=1,
                     **base_data_config,
                 ),
                 encoder="resnetv1-34-bridge",
