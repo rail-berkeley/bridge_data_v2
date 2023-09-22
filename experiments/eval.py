@@ -60,6 +60,7 @@ STEP_DURATION = 0.2
 NO_PITCH_ROLL = False
 NO_YAW = False
 STICKY_GRIPPER_NUM_STEPS = 1
+IMAGE_SIZE = 256
 
 FIXED_STD = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
@@ -104,8 +105,8 @@ def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
     encoder_def = encoders[config["encoder"]](**config["encoder_kwargs"])
 
     example_batch = {
-        "observations": {"image": np.zeros((128, 128, 3), dtype=np.uint8)},
-        "goals": {"image": np.zeros((128, 128, 3), dtype=np.uint8)},
+        "observations": {"image": np.zeros((IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8)},
+        "goals": {"image": np.zeros((IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8)},
         "actions": np.zeros(7, dtype=np.float32),
     }
 
@@ -184,7 +185,9 @@ def main(_):
             goal_eep = state_to_eep(goal_eep, 0)
             move_status = None
             while move_status != WidowXStatus.SUCCESS:
+                print(f"Moving to goal {goal_eep}")
                 move_status = widowx_client.move(goal_eep, duration=1.5)
+                print(f"Move status: {move_status}")
 
             input("Press [Enter] when ready for taking the goal image. ")
 
@@ -195,7 +198,7 @@ def main(_):
                 time.sleep(1)
 
             image_goal = (
-                obs["image"].reshape(3, 128, 128).transpose(1, 2, 0) * 255
+                obs["image"].reshape(3, IMAGE_SIZE, IMAGE_SIZE).transpose(1, 2, 0) * 255
             ).astype(np.uint8)
             full_goal_image = obs["full_image"]
 
@@ -212,6 +215,7 @@ def main(_):
         policy_name = list(policies.keys())[policy_idx]
         agent, action_mean, action_std = policies[policy_name]
         # reset env
+        print("Resetting environment...")
         widowx_client.reset()
         time.sleep(2.5)
 
@@ -249,7 +253,7 @@ def main(_):
                         cv2.waitKey(10)
 
                     image_obs = (
-                        obs["image"].reshape(3, 128, 128).transpose(1, 2, 0) * 255
+                        obs["image"].reshape(3, IMAGE_SIZE, IMAGE_SIZE).transpose(1, 2, 0) * 255
                     ).astype(np.uint8)
                     if FLAGS.high_res:
                         full_images.append(Image.fromarray(obs["full_image"]))

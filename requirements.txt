@@ -19,3 +19,4 @@ matplotlib
 pyquaternion
 opencv-python
 opencv-contrib-python
+funcsigs
