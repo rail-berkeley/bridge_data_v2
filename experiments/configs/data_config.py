@@ -20,6 +20,18 @@ ACT_STD = [
     0.48710242,
 ]
 
+ACTION_PROPRIO_METADATA = {
+    "action": {
+        "mean": ACT_MEAN,
+        "std": ACT_STD,
+        # TODO compute these
+        "min": ACT_MEAN,
+        "max": ACT_STD,
+    },
+    # TODO compute these
+    "proprio": {"mean": ACT_MEAN, "std": ACT_STD, "min": ACT_MEAN, "max": ACT_STD},
+}
+
 
 def get_config(config_string):
     possible_structures = {
@@ -37,11 +49,8 @@ def get_config(config_string):
                 ],
                 "exclude": [],
                 "sample_weights": None,
-                "action_metadata": {
-                    "mean": ACT_MEAN,
-                    "std": ACT_STD,
-                },
+                "action_proprio_metadata": ACTION_PROPRIO_METADATA,
             }
-        ),
+        )
     }
     return possible_structures[config_string]

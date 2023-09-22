@@ -39,14 +39,17 @@ class GCBCAgent(flax.struct.PyTreeNode):
             actor_loss = -(log_probs).mean()
             actor_std = dist.stddev().mean(axis=1)
 
-            return actor_loss, {
-                "actor_loss": actor_loss,
-                "mse": mse.mean(),
-                "log_probs": log_probs.mean(),
-                "pi_actions": pi_actions.mean(),
-                "mean_std": actor_std.mean(),
-                "max_std": actor_std.max(),
-            }
+            return (
+                actor_loss,
+                {
+                    "actor_loss": actor_loss,
+                    "mse": mse.mean(),
+                    "log_probs": log_probs.mean(),
+                    "pi_actions": pi_actions.mean(),
+                    "mean_std": actor_std.mean(),
+                    "max_std": actor_std.max(),
+                },
+            )
 
         # compute gradients and update params
         new_state, info = self.state.apply_loss_fns(
@@ -92,11 +95,7 @@ class GCBCAgent(flax.struct.PyTreeNode):
         log_probs = dist.log_prob(batch["actions"])
         mse = ((pi_actions - batch["actions"]) ** 2).sum(-1)
 
-        return {
-            "mse": mse,
-            "log_probs": log_probs,
-            "pi_actions": pi_actions,
-        }
+        return {"mse": mse, "log_probs": log_probs, "pi_actions": pi_actions}
 
     @classmethod
     def create(
@@ -110,9 +109,7 @@ class GCBCAgent(flax.struct.PyTreeNode):
         shared_goal_encoder: bool = True,
         early_goal_concat: bool = False,
         use_proprio: bool = False,
-        network_kwargs: dict = {
-            "hidden_dims": [256, 256],
-        },
+        network_kwargs: dict = {"hidden_dims": [256, 256]},
         policy_kwargs: dict = {
             "tanh_squash_distribution": False,
             "state_dependent_std": False,

@@ -26,7 +26,7 @@ def vp_beta_schedule(timesteps):
     T = timesteps
     b_max = 10.0
     b_min = 0.1
-    alpha = jnp.exp(-b_min / T - 0.5 * (b_max - b_min) * (2 * t - 1) / T**2)
+    alpha = jnp.exp(-b_min / T - 0.5 * (b_max - b_min) * (2 * t - 1) / T ** 2)
     betas = 1 - alpha
     return betas
 

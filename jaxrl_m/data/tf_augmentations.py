@@ -90,11 +90,7 @@ def augment_batch(images, seed, **augment_kwargs):
     for _ in range(batch_size):
         sub_seeds.append(
             tf.random.stateless_uniform(
-                [2],
-                seed=sub_seeds[-1],
-                minval=None,
-                maxval=None,
-                dtype=tf.int32,
+                [2], seed=sub_seeds[-1], minval=None, maxval=None, dtype=tf.int32
             )
         )
     images = tf.cast(images, tf.float32) / 255  # convert images to [0, 1]

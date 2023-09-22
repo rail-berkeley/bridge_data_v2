@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# TODO: remove this `eval.py`, since it is being replaced by `eval_gc` and `eval_lc`
+
 import sys
 import os
 import json
@@ -176,7 +178,7 @@ def main(_):
                 low_bound = [0.24, -0.1, 0.05, -1.57, 0]
                 high_bound = [0.4, 0.20, 0.15, 1.57, 0]
                 goal_eep = np.random.uniform(low_bound[:3], high_bound[:3])
-            widowx_client.move_gripper(1.0) # open gripper           
+            widowx_client.move_gripper(1.0) # open gripper
 
             # retry move action until success
             goal_eep = state_to_eep(goal_eep, 0)
@@ -215,19 +217,15 @@ def main(_):
         time.sleep(2.5)
 
         # move to initial position
-        try:
-            if FLAGS.initial_eep is not None:
-                assert isinstance(FLAGS.initial_eep, list)
-                initial_eep = [float(e) for e in FLAGS.initial_eep]
-                eep = state_to_eep(initial_eep, 0)
-                
-                # retry move action until success
-                move_status = None
-                while move_status != WidowXStatus.SUCCESS:
-                    move_status = widowx_client.move(eep)
-                time.sleep(1.5)
-        except Exception as e:
-            continue
+        if FLAGS.initial_eep is not None:
+            assert isinstance(FLAGS.initial_eep, list)
+            initial_eep = [float(e) for e in FLAGS.initial_eep]
+            eep = state_to_eep(initial_eep, 0)
+            
+            # retry move action until success
+            move_status = None
+            while move_status != WidowXStatus.SUCCESS:
+                move_status = widowx_client.move(eep, duration=1.5)
 
         # do rollout
         rng = jax.random.PRNGKey(0)

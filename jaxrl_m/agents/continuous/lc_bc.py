@@ -1,22 +1,22 @@
 from functools import partial
 from typing import Any
-import jax
-import jax.numpy as jnp
-from jaxrl_m.common.encoding import EncodingWrapper
-import numpy as np
+
 import flax
 import flax.linen as nn
+import jax
+import jax.numpy as jnp
+import numpy as np
 import optax
-
 from flax.core import FrozenDict
-from jaxrl_m.common.typing import Batch
-from jaxrl_m.common.typing import PRNGKey
+
 from jaxrl_m.common.common import JaxRLTrainState, ModuleDict, nonpytree_field
+from jaxrl_m.common.encoding import LCEncodingWrapper
+from jaxrl_m.common.typing import Batch, PRNGKey
 from jaxrl_m.networks.actor_critic_nets import Policy
 from jaxrl_m.networks.mlp import MLP
 
 
-class BCAgent(flax.struct.PyTreeNode):
+class LCBCAgent(flax.struct.PyTreeNode):
     state: JaxRLTrainState
     lr_schedule: Any = nonpytree_field()
 
@@ -26,7 +26,7 @@ class BCAgent(flax.struct.PyTreeNode):
             rng, key = jax.random.split(rng)
             dist = self.state.apply_fn(
                 {"params": params},
-                batch["observations"],
+                (batch["observations"], batch["goals"]),
                 temperature=1.0,
                 train=True,
                 rngs={"dropout": key},
@@ -43,8 +43,8 @@ class BCAgent(flax.struct.PyTreeNode):
                 {
                     "actor_loss": actor_loss,
                     "mse": mse.mean(),
-                    "log_probs": log_probs,
-                    "pi_actions": pi_actions,
+                    "log_probs": log_probs.mean(),
+                    "pi_actions": pi_actions.mean(),
                     "mean_std": actor_std.mean(),
                     "max_std": actor_std.max(),
                 },
@@ -64,6 +64,7 @@ class BCAgent(flax.struct.PyTreeNode):
     def sample_actions(
         self,
         observations: np.ndarray,
+        goals: np.ndarray,
         *,
         seed: PRNGKey,
         temperature: float = 1.0,
@@ -71,7 +72,7 @@ class BCAgent(flax.struct.PyTreeNode):
     ) -> jnp.ndarray:
         dist = self.state.apply_fn(
             {"params": self.state.params},
-            observations,
+            (observations, goals),
             temperature=temperature,
             name="actor",
         )
@@ -85,7 +86,7 @@ class BCAgent(flax.struct.PyTreeNode):
     def get_debug_metrics(self, batch, **kwargs):
         dist = self.state.apply_fn(
             {"params": self.state.params},
-            batch["observations"],
+            (batch["observations"], batch["goals"]),
             temperature=1.0,
             name="actor",
         )
@@ -101,8 +102,11 @@ class BCAgent(flax.struct.PyTreeNode):
         rng: PRNGKey,
         observations: FrozenDict,
         actions: jnp.ndarray,
+        goals: FrozenDict,
         # Model architecture
         encoder_def: nn.Module,
+        shared_goal_encoder: bool = True,
+        early_goal_concat: bool = False,
         use_proprio: bool = False,
         network_kwargs: dict = {"hidden_dims": [256, 256]},
         policy_kwargs: dict = {
@@ -115,7 +119,8 @@ class BCAgent(flax.struct.PyTreeNode):
         warmup_steps: int = 1000,
         decay_steps: int = 1000000,
     ):
-        encoder_def = EncodingWrapper(
+
+        encoder_def = LCEncodingWrapper(
             encoder=encoder_def, use_proprio=use_proprio, stop_gradient=False
         )
 
@@ -141,7 +146,7 @@ class BCAgent(flax.struct.PyTreeNode):
         tx = optax.adam(lr_schedule)
 
         rng, init_rng = jax.random.split(rng)
-        params = model_def.init(init_rng, actor=observations)["params"]
+        params = model_def.init(init_rng, actor=[(observations, goals)])["params"]
 
         rng, create_rng = jax.random.split(rng)
         state = JaxRLTrainState.create(

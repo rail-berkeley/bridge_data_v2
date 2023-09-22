@@ -16,7 +16,6 @@ def get_config(config_string):
 
     base_data_config = dict(
         shuffle_buffer_size=25000,
-        prefetch_num_batches=20,
         augment=True,
         augment_next_obs_goal_differently=False,
         augment_kwargs=dict(
@@ -40,14 +39,11 @@ def get_config(config_string):
             dict(
                 agent="gc_iql",
                 agent_kwargs=dict(
-                    network_kwargs=dict(
-                        hidden_dims=(256, 256, 256),
-                    ),
+                    network_kwargs=dict(hidden_dims=(256, 256, 256), dropout_rate=0.1),
                     policy_kwargs=dict(
                         tanh_squash_distribution=False,
                         state_dependent_std=False,
                         fixed_std=[1, 1, 1, 1, 1, 1, 1],
-                        dropout_rate=0.1,
                     ),
                     learning_rate=3e-4,
                     discount=0.98,
@@ -68,21 +64,16 @@ def get_config(config_string):
                 ),
                 encoder="resnetv1-34-bridge",
                 encoder_kwargs=dict(
-                    pooling_method="avg",
-                    add_spatial_coordinates=True,
-                    act="swish",
+                    pooling_method="avg", add_spatial_coordinates=True, act="swish"
                 ),
                 **base_real_config,
-            ),
+            )
         ),
         "gc_bc": ConfigDict(
             dict(
                 agent="gc_bc",
                 agent_kwargs=dict(
-                    network_kwargs=dict(
-                        hidden_dims=(256, 256, 256),
-                        dropout_rate=0.1,
-                    ),
+                    network_kwargs=dict(hidden_dims=(256, 256, 256), dropout_rate=0.1),
                     policy_kwargs=dict(
                         tanh_squash_distribution=False,
                         fixed_std=[1, 1, 1, 1, 1, 1, 1],
@@ -103,9 +94,41 @@ def get_config(config_string):
                 ),
                 encoder="resnetv1-34-bridge",
                 encoder_kwargs=dict(
-                    pooling_method="avg",
-                    add_spatial_coordinates=True,
-                    act="swish",
+                    pooling_method="avg", add_spatial_coordinates=True, act="swish"
+                ),
+                **base_real_config,
+            )
+        ),
+        "lc_bc": ConfigDict(
+            dict(
+                agent="lc_bc",
+                agent_kwargs=dict(
+                    network_kwargs=dict(hidden_dims=(256, 256, 256), dropout_rate=0.1),
+                    policy_kwargs=dict(
+                        tanh_squash_distribution=False,
+                        fixed_std=[1, 1, 1, 1, 1, 1, 1],
+                        state_dependent_std=False,
+                    ),
+                    early_goal_concat=True,
+                    shared_goal_encoder=True,
+                    use_proprio=False,
+                    learning_rate=3e-4,
+                    warmup_steps=2000,
+                    decay_steps=int(2e6),
+                ),
+                dataset_kwargs=dict(
+                    goal_relabeling_strategy="uniform",
+                    goal_relabeling_kwargs=dict(reached_proportion=0.0),
+                    relabel_actions=True,
+                    load_language=True,
+                    skip_unlabeled=True,
+                    **base_data_config,
+                ),
+                text_processor="muse_embedding",
+                text_processor_kwargs=dict(),
+                encoder="resnetv1-34-bridge-film",
+                encoder_kwargs=dict(
+                    pooling_method="avg", add_spatial_coordinates=True, act="swish"
                 ),
                 **base_real_config,
             )
@@ -113,7 +136,7 @@ def get_config(config_string):
         "gc_ddpm_bc": ConfigDict(
             dict(
                 agent="gc_ddpm_bc",
-                obs_horizon=2,
+                obs_horizon=1,
                 agent_kwargs=dict(
                     score_network_kwargs=dict(
                         time_dim=32,
@@ -137,14 +160,12 @@ def get_config(config_string):
                     goal_relabeling_strategy="uniform",
                     goal_relabeling_kwargs=dict(reached_proportion=0.0),
                     relabel_actions=True,
-                    act_pred_horizon=4,
+                    act_pred_horizon=1,
                     **base_data_config,
                 ),
                 encoder="resnetv1-34-bridge",
                 encoder_kwargs=dict(
-                    pooling_method="avg",
-                    add_spatial_coordinates=True,
-                    act="swish",
+                    pooling_method="avg", add_spatial_coordinates=True, act="swish"
                 ),
                 **base_real_config,
             )
@@ -154,17 +175,11 @@ def get_config(config_string):
                 agent="stable_contrastive_rl",
                 agent_kwargs=dict(
                     critic_network_kwargs=dict(
-                        hidden_dims=(256, 256, 256),
-                        use_layer_norm=True,
+                        hidden_dims=(256, 256, 256), use_layer_norm=True
                     ),
-                    critic_kwargs=dict(
-                        init_final=1e-12,
-                        repr_dim=16,
-                        twin_q=True,
-                    ),
+                    critic_kwargs=dict(init_final=1e-12, repr_dim=16, twin_q=True),
                     policy_network_kwargs=dict(
-                        hidden_dims=(256, 256, 256),
-                        dropout_rate=0.1,
+                        hidden_dims=(256, 256, 256), dropout_rate=0.1
                     ),
                     policy_kwargs=dict(
                         tanh_squash_distribution=False,
@@ -192,9 +207,7 @@ def get_config(config_string):
                 ),
                 encoder="resnetv1-34-bridge",
                 encoder_kwargs=dict(
-                    pooling_method="avg",
-                    add_spatial_coordinates=False,
-                    act="swish",
+                    pooling_method="avg", add_spatial_coordinates=False, act="swish"
                 ),
                 **base_real_config,
             )

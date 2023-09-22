@@ -1,5 +1,6 @@
-import flax.linen as nn
 from typing import Dict, Optional, Tuple
+
+import flax.linen as nn
 import jax
 import jax.numpy as jnp
 from einops import rearrange, repeat
@@ -78,6 +79,58 @@ class GCEncodingWrapper(nn.Module):
             encoding = self.encoder(obs_image)
             goal_encoding = self.goal_encoder(goals["image"])
             encoding = jnp.concatenate([encoding, goal_encoding], axis=-1)
+
+        if len(observations["image"].shape) == 5:
+            # unfold obs_horizon from batch_size
+            encoding = rearrange(
+                encoding, "(B T) F -> B (T F)", B=batch_size, T=obs_horizon
+            )
+
+        if self.use_proprio:
+            encoding = jnp.concatenate([encoding, observations["proprio"]], axis=-1)
+
+        if self.stop_gradient:
+            encoding = jax.lax.stop_gradient(encoding)
+
+        return encoding
+
+
+class LCEncodingWrapper(nn.Module):
+    """
+    Encodes observations and language instructions into a single flat encoding.
+
+    Takes a tuple (observations, goals) as input, where goals contains the language instruction.
+
+    Args:
+        encoder: The encoder network for observations.
+        use_proprio: Whether to concatenate proprioception (after encoding).
+        stop_gradient: Whether to stop the gradient after the encoder.
+    """
+
+    encoder: nn.Module
+    use_proprio: bool
+    stop_gradient: bool
+
+    def __call__(
+        self,
+        observations_and_goals: Tuple[Dict[str, jnp.ndarray], Dict[str, jnp.ndarray]],
+    ) -> jnp.ndarray:
+        observations, goals = observations_and_goals
+
+        if len(observations["image"].shape) == 5:
+            # obs history case
+            batch_size, obs_horizon = observations["image"].shape[:2]
+            # fold batch_size into obs_horizon to encode each frame separately
+            obs_image = rearrange(observations["image"], "B T H W C -> (B T) H W C")
+            # repeat language so that there's an instruction for each frame
+            language = repeat(
+                goals["language"], "B E -> (B repeat) E", repeat=obs_horizon
+            )
+        else:
+            obs_image = observations["image"]
+            language = goals["language"]
+
+        encoding = self.encoder(obs_image, cond_var=language)
 
         if len(observations["image"].shape) == 5:
             # unfold obs_horizon from batch_size

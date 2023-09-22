@@ -46,8 +46,7 @@ def uniform(traj, *, reached_proportion):
 
     # select goals
     traj["goals"] = tf.nest.map_structure(
-        lambda x: tf.gather(x, goal_idxs),
-        traj["next_observations"],
+        lambda x: tf.gather(x, goal_idxs), traj["next_observations"]
     )
 
     # reward is 0 for goal-reaching transitions, -1 otherwise
@@ -70,12 +69,7 @@ def last_state_upweighted(traj, *, reached_proportion):
     traj_len = tf.shape(traj["terminals"])[0]
 
     # select a random future index for each transition
-    offsets = tf.random.uniform(
-        [traj_len],
-        minval=1,
-        maxval=traj_len,
-        dtype=tf.int32,
-    )
+    offsets = tf.random.uniform([traj_len], minval=1, maxval=traj_len, dtype=tf.int32)
 
     # select random transitions to relabel as goal-reaching
     goal_reached_mask = tf.random.uniform([traj_len]) < reached_proportion
@@ -95,8 +89,7 @@ def last_state_upweighted(traj, *, reached_proportion):
 
     # select goals
     traj["goals"] = tf.nest.map_structure(
-        lambda x: tf.gather(x, indices),
-        traj["next_observations"],
+        lambda x: tf.gather(x, indices), traj["next_observations"]
     )
 
     # reward is 0 for goal-reaching transitions, -1 otherwise
@@ -142,8 +135,7 @@ def geometric(traj, *, reached_proportion, discount):
 
     # select goals
     traj["goals"] = tf.nest.map_structure(
-        lambda x: tf.gather(x, goal_idxs),
-        traj["next_observations"],
+        lambda x: tf.gather(x, goal_idxs), traj["next_observations"]
     )
 
     # reward is 0 for goal-reaching transitions, -1 otherwise
