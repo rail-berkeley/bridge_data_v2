@@ -184,9 +184,8 @@ def main(_):
             goal_eep = state_to_eep(goal_eep, 0)
             move_status = None
             while move_status != WidowXStatus.SUCCESS:
-                move_status = widowx_client.move(goal_eep)
+                move_status = widowx_client.move(goal_eep, duration=1.5)
 
-            time.sleep(1.5)
             input("Press [Enter] when ready for taking the goal image. ")
 
             obs = widowx_client.get_observation()
