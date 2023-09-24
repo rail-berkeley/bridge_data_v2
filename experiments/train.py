@@ -88,8 +88,6 @@ def main(_):
         for sub_list in task_paths
     ]
 
-    obs_horizon = FLAGS.config.get("obs_horizon")
-
     train_data = BridgeDataset(
         train_paths,
         FLAGS.config.seed,
@@ -97,7 +95,6 @@ def main(_):
         train=True,
         action_proprio_metadata=FLAGS.bridgedata_config.action_proprio_metadata,
         sample_weights=FLAGS.bridgedata_config.sample_weights,
-        obs_horizon=obs_horizon,
         **FLAGS.config.dataset_kwargs,
     )
     val_data = BridgeDataset(
@@ -106,7 +103,6 @@ def main(_):
         batch_size=FLAGS.config.batch_size,
         action_proprio_metadata=FLAGS.bridgedata_config.action_proprio_metadata,
         train=False,
-        obs_horizon=obs_horizon,
         **FLAGS.config.dataset_kwargs,
     )
 

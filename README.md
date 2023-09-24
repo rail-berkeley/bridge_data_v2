@@ -58,11 +58,9 @@ To evaluate language-conditioned BC, replace `eval_gc.py` with `eval_lc.py` in t
 
 ## Provided Checkpoints
 
-Checkpoints for GCBC, LCBC, D-GCBC, GCIQL, CRL, and RT-1 are available [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/checkpoints/). Each checkpoint (except RT-1) has an associated JSON file with its configuration information. The name of each checkpoint indicates whether it was trained with 128x128 images or 256x256 images.
+Checkpoints for GCBC, LCBC, D-GCBC, GCIQL, and CRL are available [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/checkpoints/). Each checkpoint has an associated JSON file with its configuration information. The name of each checkpoint indicates whether it was trained with 128x128 images or 256x256 images.
 
-An evaluation script for the RT-1 checkpoint is available in this separate repo (TODO).
-
-We don't currently have a checkpoint for ACT available but may release one soon. 
+We don't currently have a checkpoints for ACT or RT-1 available but may release them soon. 
 
 ## Environment
 

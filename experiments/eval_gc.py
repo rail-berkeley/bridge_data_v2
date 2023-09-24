@@ -72,13 +72,15 @@ def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
     # create encoder from wandb config
     encoder_def = encoders[config["encoder"]](**config["encoder_kwargs"])
 
-    if "act_pred_horizon" in config:
-        example_actions = np.zeros((1, config["act_pred_horizon"], 7), dtype=np.float32)
+    act_pred_horizon = config["dataset_kwargs"].get("act_pred_horizon")
+    obs_horizon = config["dataset_kwargs"].get("obs_horizon")
+
+    if act_pred_horizon is not None:
+        example_actions = np.zeros((1, act_pred_horizon, 7), dtype=np.float32)
     else:
         example_actions = np.zeros((1, 7), dtype=np.float32)
 
-    if "obs_horizon" in config:
-        obs_horizon = config["obs_horizon"]
+    if obs_horizon is not None:
         example_obs = {
             "image": np.zeros(
                 (1, obs_horizon, FLAGS.im_size, FLAGS.im_size, 3), dtype=np.uint8
@@ -88,7 +90,6 @@ def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
         example_obs = {
             "image": np.zeros((1, FLAGS.im_size, FLAGS.im_size, 3), dtype=np.uint8)
         }
-        obs_horizon = None
 
     example_batch = {
         "observations": example_obs,

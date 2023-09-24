@@ -136,7 +136,6 @@ def get_config(config_string):
         "gc_ddpm_bc": ConfigDict(
             dict(
                 agent="gc_ddpm_bc",
-                obs_horizon=1,
                 agent_kwargs=dict(
                     score_network_kwargs=dict(
                         time_dim=32,
@@ -160,6 +159,7 @@ def get_config(config_string):
                     goal_relabeling_strategy="uniform",
                     goal_relabeling_kwargs=dict(reached_proportion=0.0),
                     relabel_actions=True,
+                    obs_horizon=1,
                     act_pred_horizon=1,
                     **base_data_config,
                 ),
