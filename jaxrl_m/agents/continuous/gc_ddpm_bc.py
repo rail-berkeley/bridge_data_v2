@@ -155,7 +155,8 @@ class GCDDPMBCAgent(flax.struct.PyTreeNode):
 
         action_0, rng = input_tuple
 
-        if len(observations["image"].shape) == 4:
+        if batch_size == 1:
+            # this is an evaluation call so unbatch
             return action_0[0]
         else:
             return action_0

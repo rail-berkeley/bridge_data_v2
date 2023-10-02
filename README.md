@@ -11,7 +11,7 @@ We provide implementations for the following subset of methods described in the 
 - Language-conditioned BC
 
 The official implementations and papers for all the methods can be found here:
-- [IQDL](https://github.com/philippe-eecs/IDQL) (IQL + diffusion policy) [[Hansen-Estruch et al.](https://github.com/philippe-eecs/IDQL)] and [Diffusion Policy](https://diffusion-policy.cs.columbia.edu/) [[Chi et al.](https://diffusion-policy.cs.columbia.edu/)]
+- [IDQL](https://github.com/philippe-eecs/IDQL) (IQL + diffusion policy) [[Hansen-Estruch et al.](https://github.com/philippe-eecs/IDQL)] and [Diffusion Policy](https://diffusion-policy.cs.columbia.edu/) [[Chi et al.](https://diffusion-policy.cs.columbia.edu/)]
 - [IQL](https://github.com/ikostrikov/implicit_q_learning) [[Kostrikov et al.](https://arxiv.org/abs/2110.06169)]
 - [Contrastive RL](https://chongyi-zheng.github.io/stable_contrastive_rl/) [[Zheng et al.](https://arxiv.org/abs/2306.03346), [Eysenbach et al.](https://arxiv.org/abs/2206.07568)]
 - [RT-1](https://github.com/google-research/robotics_transformer) [[Brohan et al.](https://arxiv.org/abs/2212.06817)]
@@ -20,10 +20,10 @@ The official implementations and papers for all the methods can be found here:
 Please open a GitHub issue if you encounter problems with this code. 
 
 ## Data 
+The raw dataset (comprised of JPEGs, PNGs, and pkl files) can be downloaded [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/data/). `demos*.zip` file contains the demonstration data, and `scripted*.zip` contains the data collected with a scripted policy. For training, the raw data needs to be converted into a format that is compatible with a data loader. We offer two options:
 
-The raw dataset (comprised of JPEGs, PNGs, and pkl files) can be downloaded from the [website](https://rail-berkeley.github.io/bridgedata/). For training, the raw data needs to be converted into a TFRecord format that is compatible with the data loader. First, use `data_processing/bridgedata_raw_to_numpy.py` to convert the raw data into numpy files. Then, use `data_processing/bridgedata_numpy_to_tfrecord.py` to convert the numpy files into TFRecord files. 
-
-We plan to release a pre-processed [TFDS](https://www.tensorflow.org/datasets/catalog/overview) version of the data in the [RLDS](https://github.com/google-research/rlds) format soon.
+- A custom `tf.data` loader. This data loader is implemented in `jaxrl_m/data/bridge_dataset.py` and is used by the training script in this repo. The scripts in the `data_processing` folder convert the raw data into the format required by this data loader. First, use `bridgedata_raw_to_numpy.py` to convert the raw data into NumPy files. Then, use `bridgedata_numpy_to_tfrecord.py` to convert the NumPy files into TFRecord files. 
+- A [TensorFlow Datasets](https://www.tensorflow.org/datasets/catalog/overview) loader. Tensorflow Datasets is a high level wrapper around `tf.data`. We offer a pre-processed TFDS version of the dataset (downsampled to 256x256) in the `tfds` folder here [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/data/). In the TFDS dataset, the trajectories are structured using the [RLDS](https://github.com/google-research/rlds) format. Kevin Black's [DLIMP](https://github.com/kvablack/dlimp) repo provides useful tools for loading and applying transformations to RLDS formatted TFDS datasets (see the `from_rlds` function).
 
 ## Training
 
@@ -58,11 +58,9 @@ To evaluate language-conditioned BC, replace `eval_gc.py` with `eval_lc.py` in t
 
 ## Provided Checkpoints
 
-Checkpoints for GCBC, LCBC, D-GCBC, GCIQL, CRL, and RT-1 are available [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/checkpoints/). Each checkpoint (except RT-1) has an associated JSON file with its configuration information. The name of each checkpoint indicates whether it was trained with 128x128 images or 256x256 images.
+Checkpoints for GCBC, LCBC, D-GCBC, GCIQL, and CRL are available [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/checkpoints/). Each checkpoint has an associated JSON file with its configuration information. The name of each checkpoint indicates whether it was trained with 128x128 images or 256x256 images.
 
-An evaluation script for the RT-1 checkpoint is available in this separate repo (TODO).
-
-We don't currently have a checkpoint for ACT available but may release one soon. 
+We don't currently have a checkpoints for ACT or RT-1 available but may release them soon. 
 
 ## Environment
 
@@ -87,7 +85,7 @@ See the [Jax Github page](https://github.com/google/jax) for more details on ins
 
 ## Cite
 
-This code is based on [dibyaghosh/jaxrl_m](https://github.com/dibyaghosh/jaxrl_m).
+This code is based on [jaxrl_m](https://github.com/dibyaghosh/jaxrl_m) from Dibya Ghosh.
 
 If you use this code and/or BridgeData V2 in your work, please cite the paper with:
 
