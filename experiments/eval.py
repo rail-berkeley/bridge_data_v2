@@ -63,7 +63,7 @@ STEP_DURATION = 0.2
 NO_PITCH_ROLL = False
 NO_YAW = False
 STICKY_GRIPPER_NUM_STEPS = 1
-WORKSPACE_BOUNDS = [[0.1, -0.15, -0.1, -1.57, 0], [0.45, 0.25, 0.25, 1.57, 0]]
+WORKSPACE_BOUNDS = [[0.1, -0.15, -0.01, -1.57, 0], [0.45, 0.25, 0.25, 1.57, 0]]
 CAMERA_TOPICS = [{"name": "/blue/image_raw"}]
 FIXED_STD = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
@@ -249,7 +249,6 @@ def main(_):
         # ask for which policy to use
         if len(policies) == 1:
             policy_idx = 0
-            input("Press [Enter] to start.")
         else:
             print("policies:")
             for i, name in enumerate(policies.keys()):
@@ -263,6 +262,7 @@ def main(_):
         if FLAGS.goal_type == "gc":
             image_goal = request_goal_image(image_goal, widowx_client)
             goal_obs = {"image": image_goal}
+            input("Press [Enter] to start.")
         elif FLAGS.goal_type == "lc":
             instruction = request_goal_language(None, text_processors)
             goal_obs = {"language": instruction}

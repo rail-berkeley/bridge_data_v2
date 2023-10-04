@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import sys
 import os
 import time
@@ -13,7 +11,6 @@ from absl import app, flags, logging
 import numpy as np
 import tensorflow as tf
 
-import cv2
 import jax
 from PIL import Image
 import imageio
@@ -21,13 +18,11 @@ import imageio
 from flax.training import checkpoints
 from jaxrl_m.vision import encoders
 from jaxrl_m.agents import agents
-from jaxrl_m.data.text_processing import text_processors
 
 # bridge_data_robot imports
-from widowx_envs.widowx_env_service import WidowXClient, WidowXStatus
-from utils import state_to_eep, stack_obs
-
-##############################################################################
+from widowx_envs.widowx_env import BridgeDataRailRLPrivateWidowX
+from multicam_server.topic_utils import IMTopic
+from utils import stack_obs
 
 np.set_printoptions(suppress=True)
 
@@ -41,21 +36,15 @@ flags.DEFINE_multi_string(
 flags.DEFINE_multi_string(
     "checkpoint_config_path", None, "Path to checkpoint config JSON", required=True
 )
-flags.DEFINE_string("goal_type", "gc", "Goal type", required=True)
 flags.DEFINE_integer("im_size", None, "Image size", required=True)
 flags.DEFINE_string("video_save_path", None, "Path to save video")
-flags.DEFINE_string("goal_image_path", None, "Path to a single goal image") # not used by lc
+flags.DEFINE_string("goal_image_path", None, "Path to a single goal image")
 flags.DEFINE_integer("num_timesteps", 120, "num timesteps")
 flags.DEFINE_bool("blocking", False, "Use the blocking controller")
-flags.DEFINE_spaceseplist("goal_eep", None, "Goal position")  # not used by lc
+flags.DEFINE_spaceseplist("goal_eep", None, "Goal position")
 flags.DEFINE_spaceseplist("initial_eep", None, "Initial position")
 flags.DEFINE_integer("act_exec_horizon", 1, "Action sequence length")
 flags.DEFINE_bool("deterministic", True, "Whether to sample action deterministically")
-flags.DEFINE_string("ip", "localhost", "IP address of the robot")
-flags.DEFINE_integer("port", 5556, "Port of the robot")
-
-# show image flag
-flags.DEFINE_bool("show_image", False, "Show image")
 
 ##############################################################################
 
@@ -63,12 +52,11 @@ STEP_DURATION = 0.2
 NO_PITCH_ROLL = False
 NO_YAW = False
 STICKY_GRIPPER_NUM_STEPS = 1
-WORKSPACE_BOUNDS = [[0.1, -0.15, -0.1, -1.57, 0], [0.45, 0.25, 0.25, 1.57, 0]]
-CAMERA_TOPICS = [{"name": "/blue/image_raw"}]
-FIXED_STD = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+WORKSPACE_BOUNDS = np.array([[0.1, -0.15, -0.1, -1.57, 0], [0.45, 0.25, 0.25, 1.57, 0]])
+CAMERA_TOPICS = [IMTopic("/blue/image_raw")]
+FIXED_STD = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 ##############################################################################
-
 
 def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
     with open(checkpoint_config_path, "r") as f:
@@ -80,37 +68,38 @@ def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
     act_pred_horizon = config["dataset_kwargs"].get("act_pred_horizon")
     obs_horizon = config["dataset_kwargs"].get("obs_horizon")
 
-    # Set action
     if act_pred_horizon is not None:
         example_actions = np.zeros((1, act_pred_horizon, 7), dtype=np.float32)
     else:
         example_actions = np.zeros((1, 7), dtype=np.float32)
 
-    # Set observations
-    if obs_horizon is None:
-        img_obs_shape = (1, FLAGS.im_size, FLAGS.im_size, 3)
+    if obs_horizon is not None:
+        example_obs = {
+            "image": np.zeros(
+                (1, obs_horizon, FLAGS.im_size, FLAGS.im_size, 3), dtype=np.uint8
+            )
+        }
     else:
-        img_obs_shape = (1, obs_horizon, FLAGS.im_size, FLAGS.im_size, 3)
-    example_obs = {"image": np.zeros(img_obs_shape, dtype=np.uint8)}
+        example_obs = {
+            "image": np.zeros((1, FLAGS.im_size, FLAGS.im_size, 3), dtype=np.uint8)
+        }
 
-    # Set goals
-    if FLAGS.goal_type == "gc":
-        example_goals = {
+    example_batch = {
+        "observations": example_obs,
+        "goals": {
             "image": np.zeros((1, FLAGS.im_size, FLAGS.im_size, 3), dtype=np.uint8)
         },
-    elif FLAGS.goal_type == "lc":
-        example_goals = {"language": np.zeros((1, 512), dtype=np.float32)},
-    else:
-        raise ValueError(f"Unknown goal type: {FLAGS.goal_type}")
+        "actions": example_actions,
+    }
 
     # create agent from wandb config
     rng = jax.random.PRNGKey(0)
     rng, construct_rng = jax.random.split(rng)
     agent = agents[config["agent"]].create(
         rng=construct_rng,
-        observations=example_obs,
-        goals=example_goals,
-        actions=example_actions,
+        observations=example_batch["observations"],
+        goals=example_batch["goals"],
+        actions=example_batch["actions"],
         encoder_def=encoder_def,
         **config["agent_kwargs"],
     )
@@ -132,70 +121,8 @@ def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
         action = action * action_std + action_mean
         return action
 
-    text_processor = None
-    if FLAGS.goal_type == "lc":
-        text_processor = text_processors[config["text_processor"]](
-            **config["text_processor_kwargs"]
-        )
+    return get_action, obs_horizon
 
-    return get_action, obs_horizon, text_processor
-
-def request_goal_image(image_goal, widowx_client):
-    """
-    Request a new goal image from the user.
-    """
-    # ask for new goal
-    if image_goal is None:
-        print("Taking a new goal...")
-        ch = "y"
-    else:
-        ch = input("Taking a new goal? [y/n]")
-    if ch == "y":
-        if FLAGS.goal_eep is not None:
-            assert isinstance(FLAGS.goal_eep, list)
-            goal_eep = [float(e) for e in FLAGS.goal_eep]
-        else:
-            low_bound = np.array(WORKSPACE_BOUNDS[0])[:3] + 0.03
-            high_bound = np.array(WORKSPACE_BOUNDS[1])[:3] - 0.03
-            goal_eep = np.random.uniform(low_bound, high_bound)
-        widowx_client.move_gripper(1.0) # open gripper
-
-        # retry move action until success
-        goal_eep = state_to_eep(goal_eep, 0)
-        move_status = None
-        while move_status != WidowXStatus.SUCCESS:
-            move_status = widowx_client.move(goal_eep, duration=1.5)
-
-        input("Press [Enter] when ready for taking the goal image. ")
-
-        obs = widowx_client.get_observation()
-        while obs is None:
-            print("WARNING retrying to get observation...")
-            obs = widowx_client.get_observation()
-            time.sleep(1)
-
-        image_goal = (
-            obs["image"].reshape(3, FLAGS.im_size, FLAGS.im_size).transpose(1, 2, 0)
-            * 255
-        ).astype(np.uint8)
-    return image_goal
-
-
-def request_goal_language(instruction, text_processor):
-    """
-    Request a new goal language from the user.
-    """
-    # ask for new instruction
-    if instruction is None:
-        ch = "y"
-    else:
-        ch = input("New instruction? [y/n]")
-    if ch == "y":
-        instruction = text_processor.encode(input("Instruction?"))
-    return instruction
-
-
-##############################################################################
 
 def main(_):
     assert len(FLAGS.checkpoint_weights_path) == len(FLAGS.checkpoint_config_path)
@@ -232,19 +159,42 @@ def main(_):
         "return_full_image": False,
         "camera_topics": CAMERA_TOPICS,
     }
-    widowx_client = WidowXClient(FLAGS.ip, FLAGS.port)
-    widowx_client.init(env_params, image_size=FLAGS.im_size)
+    env = BridgeDataRailRLPrivateWidowX(env_params, fixed_image_size=FLAGS.im_size)
 
-    # load goals
-    if FLAGS.goal_type == "gc":
-        image_goal = None
-        if FLAGS.goal_image_path is not None:
-            image_goal = np.array(Image.open(FLAGS.goal_image_path))
-    elif FLAGS.goal_type == "lc":
-        instruction = None
+    # load image goal
+    image_goal = None
+    if FLAGS.goal_image_path is not None:
+        image_goal = np.array(Image.open(FLAGS.goal_image_path))
 
     # goal sampling loop
     while True:
+        # ask for new goal
+        if image_goal is None:
+            print("Taking a new goal...")
+            ch = "y"
+        else:
+            ch = input("Taking a new goal? [y/n]")
+        if ch == "y":
+            if FLAGS.goal_eep is not None:
+                assert isinstance(FLAGS.goal_eep, list)
+                goal_eep = [float(e) for e in FLAGS.goal_eep]
+            else:
+                low_bound = WORKSPACE_BOUNDS[0][:3] + 0.03
+                high_bound = WORKSPACE_BOUNDS[1][:3] - 0.03
+                goal_eep = np.random.uniform(low_bound, high_bound)
+            env.controller().open_gripper(True)
+            try:
+                env.controller().move_to_state(goal_eep, 0, duration=1.5)
+                env._reset_previous_qpos()
+            except Exception as e:
+                continue
+            input("Press [Enter] when ready for taking the goal image. ")
+            obs = env.current_obs()
+            image_goal = (
+                obs["image"].reshape(3, FLAGS.im_size, FLAGS.im_size).transpose(1, 2, 0)
+                * 255
+            ).astype(np.uint8)
+
         # ask for which policy to use
         if len(policies) == 1:
             policy_idx = 0
@@ -256,37 +206,28 @@ def main(_):
             policy_idx = int(input("select policy: "))
 
         policy_name = list(policies.keys())[policy_idx]
-        get_action, obs_horizon, text_processors = policies[policy_name]
-
-        # request goal
-        if FLAGS.goal_type == "gc":
-            image_goal = request_goal_image(image_goal, widowx_client)
-            goal_obs = {"image": image_goal}
-        elif FLAGS.goal_type == "lc":
-            instruction = request_goal_language(None, text_processors)
-            goal_obs = {"language": instruction}
-        else:
-            raise ValueError(f"Unknown goal type: {FLAGS.goal_type}")
-
-        # reset env
-        widowx_client.reset()
-        time.sleep(2.5)
+        get_action, obs_horizon = policies[policy_name]
+        try:
+            env.reset()
+            env.start()
+        except Exception as e:
+            continue
 
         # move to initial position
-        if FLAGS.initial_eep is not None:
-            assert isinstance(FLAGS.initial_eep, list)
-            initial_eep = [float(e) for e in FLAGS.initial_eep]
-            eep = state_to_eep(initial_eep, 0)
-            
-            # retry move action until success
-            move_status = None
-            while move_status != WidowXStatus.SUCCESS:
-                move_status = widowx_client.move(eep, duration=1.5)
+        try:
+            if FLAGS.initial_eep is not None:
+                assert isinstance(FLAGS.initial_eep, list)
+                initial_eep = [float(e) for e in FLAGS.initial_eep]
+                env.controller().move_to_state(initial_eep, 0, duration=1.5)
+                env._reset_previous_qpos()
+        except Exception as e:
+            continue
 
         # do rollout
+        obs = env.current_obs()
         last_tstep = time.time()
         images = []
-        image_goals = [] # only used when goal_type == "gc"
+        goals = []
         t = 0
         if obs_horizon is not None:
             obs_hist = deque(maxlen=obs_horizon)
@@ -296,16 +237,6 @@ def main(_):
         try:
             while t < FLAGS.num_timesteps:
                 if time.time() > last_tstep + STEP_DURATION or FLAGS.blocking:
-
-                    obs = widowx_client.get_observation()
-                    if obs is None:
-                        print("WARNING retrying to get observation...")
-                        continue
-
-                    if FLAGS.show_image:
-                        cv2.imshow("img_view", obs["full_image"])
-                        cv2.waitKey(10)
-
                     image_obs = (
                         obs["image"]
                         .reshape(3, FLAGS.im_size, FLAGS.im_size)
@@ -313,6 +244,7 @@ def main(_):
                         * 255
                     ).astype(np.uint8)
                     obs = {"image": image_obs, "proprio": obs["state"]}
+                    goal_obs = {"image": image_goal}
                     if obs_horizon is not None:
                         if len(obs_hist) == 0:
                             obs_hist.extend([obs] * obs_horizon)
@@ -321,8 +253,8 @@ def main(_):
                         obs = stack_obs(obs_hist)
 
                     last_tstep = time.time()
-                    actions = get_action(obs, goal_obs)
 
+                    actions = get_action(obs, goal_obs)
                     if len(actions.shape) == 1:
                         actions = actions[None]
                     for i in range(FLAGS.act_exec_horizon):
@@ -352,12 +284,13 @@ def main(_):
                             action[5] = 0
 
                         # perform environment step
-                        widowx_client.step_action(action)
+                        obs, _, _, _ = env.step(
+                            action, last_tstep + STEP_DURATION, blocking=FLAGS.blocking
+                        )
 
                         # save image
                         images.append(image_obs)
-                        if FLAGS.goal_type == "gc":
-                            image_goals.append(image_goal)
+                        goals.append(image_goal)
 
                         t += 1
         except Exception as e:
@@ -371,11 +304,8 @@ def main(_):
                 FLAGS.video_save_path,
                 f"{curr_time}_{policy_name}_sticky_{STICKY_GRIPPER_NUM_STEPS}.mp4",
             )
-            if FLAGS.goal_type == "gc":
-                video = np.concatenate([np.stack(image_goals), np.stack(images)], axis=1)
-                imageio.mimsave(save_path, video, fps=1.0 / STEP_DURATION * 3)
-            else:
-                imageio.mimsave(save_path, images, fps=1.0 / STEP_DURATION * 3)
+            video = np.concatenate([np.stack(goals), np.stack(images)], axis=1)
+            imageio.mimsave(save_path, video, fps=1.0 / STEP_DURATION * 3)
 
 
 if __name__ == "__main__":
