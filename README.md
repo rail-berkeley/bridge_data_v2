@@ -36,20 +36,28 @@ python experiments/train.py \
     --name NAME
 ```
 
+
 Training hyperparameters can be modified in `experiments/configs/data_config.py` and data parameters (e.g. subsets to include/exclude) can be modified in `experiments/configs/train_config.py`. 
 
 ## Evaluation
 
 First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https://github.com/rail-berkeley/bridge_data_robot). Then, run the command:
 
-```
-python experiments/eval_gc.py \
-    --num_timesteps NUM_TIMESTEPS \
-    --video_save_path VIDEO_DIR \
-    --checkpoint_weights_path CHECKPOINT_WEIGHTS_PATH \
-    --checkpoint_config_path CHECKPOINT_CONFIG_PATH \
-    --im_size IMAGE_SIZE
-    --blocking
+```bash
+# Specify the path to the downloaded checkpoints directory
+export CHECKPOINT_DIR=/mount/harddrive/homer/checkpoints
+
+# For GCBC
+python3 experiments/eval.py \
+  --checkpoint_weights_path $CHECKPOINT_DIR/checkpoint_300000 \
+  --checkpoint_config_path $CHECKPOINT_DIR/gcbc_256_config.json \
+  --im_size 256 --goal_type gc --show_image
+
+# For LCBC
+python3 experiments/eval.py \
+  --checkpoint_weights_path $CHECKPOINT_DIR/checkpoint_145000 \
+  --checkpoint_config_path $CHECKPOINT_DIR/lcbc_256_config.json \
+  --im_size 256 --goal_type lc --show_image
 ```
 
 You can also specify an initial position for the end effector with the flag `--initial_eep`. Similarly, use the flag `--goal_eep` to specify the position of the end effector when taking the goal image.

@@ -20,10 +20,10 @@ from jaxrl_m.agents import agents
 from jaxrl_m.data.text_processing import text_processors
 
 # bridge_data_robot imports
-from widowx_envs.widowx_env_service import WidowXClient, WidowXConfigs, WidowXStatus
-from utils import state_to_eep, stack_obs
+from widowx_envs.widowx_env import BridgeDataRailRLPrivateWidowX
+from multicam_server.topic_utils import IMTopic
+from utils import stack_obs
 
-##############################################################################
 
 np.set_printoptions(suppress=True)
 
@@ -44,8 +44,6 @@ flags.DEFINE_bool("blocking", False, "Use the blocking controller")
 flags.DEFINE_spaceseplist("initial_eep", None, "Initial position")
 flags.DEFINE_integer("act_exec_horizon", 1, "Action sequence length")
 flags.DEFINE_bool("deterministic", True, "Whether to sample action deterministically")
-flags.DEFINE_string("ip", "localhost", "IP address of the robot")
-flags.DEFINE_integer("port", 5556, "Port of the robot")
 
 ##############################################################################
 
@@ -54,7 +52,7 @@ NO_PITCH_ROLL = False
 NO_YAW = False
 STICKY_GRIPPER_NUM_STEPS = 1
 WORKSPACE_BOUNDS = np.array([[0.1, -0.15, -0.1, -1.57, 0], [0.45, 0.25, 0.25, 1.57, 0]])
-CAMERA_TOPICS = [{"name": "/blue/image_raw"}]
+CAMERA_TOPICS = [IMTopic("/blue/image_raw")]
 FIXED_STD = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 ##############################################################################
@@ -162,8 +160,8 @@ def main(_):
         "return_full_image": False,
         "camera_topics": CAMERA_TOPICS,
     }
-    widowx_client = WidowXClient(FLAGS.ip, FLAGS.port)
-    widowx_client.init(env_params, image_size=FLAGS.im_size)
+    env = BridgeDataRailRLPrivateWidowX(env_params, fixed_image_size=FLAGS.im_size)
+
     instruction = None
 
     # instruction sampling loop
@@ -189,22 +187,24 @@ def main(_):
         if ch == "y":
             instruction = text_processor.encode(input("Instruction?"))
 
-        # reset env
-        widowx_client.reset()
-        time.sleep(2.5)
+        try:
+            env.reset()
+            env.start()
+        except Exception as e:
+            continue
 
         # move to initial position
-        if FLAGS.initial_eep is not None:
-            assert isinstance(FLAGS.initial_eep, list)
-            initial_eep = [float(e) for e in FLAGS.initial_eep]
-            eep = state_to_eep(initial_eep, 0)
-            
-            # retry move action until success
-            move_status = None
-            while move_status != WidowXStatus.SUCCESS:
-                move_status = widowx_client.move(eep, duration=1.5)
+        try:
+            if FLAGS.initial_eep is not None:
+                assert isinstance(FLAGS.initial_eep, list)
+                initial_eep = [float(e) for e in FLAGS.initial_eep]
+                env.controller().move_to_state(initial_eep, 0, duration=1.5)
+                env._reset_previous_qpos()
+        except Exception as e:
+            continue
 
         # do rollout
+        obs = env.current_obs()
         last_tstep = time.time()
         images = []
         t = 0
@@ -216,12 +216,6 @@ def main(_):
         try:
             while t < FLAGS.num_timesteps:
                 if time.time() > last_tstep + STEP_DURATION or FLAGS.blocking:
-
-                    obs = widowx_client.get_observation()
-                    if obs is None:
-                        print("WARNING retrying to get observation...")
-                        continue
-
                     image_obs = (
                         obs["image"]
                         .reshape(3, FLAGS.im_size, FLAGS.im_size)
@@ -269,7 +263,9 @@ def main(_):
                             action[5] = 0
 
                         # perform environment step
-                        widowx_client.step_action(action)
+                        obs, _, _, _ = env.step(
+                            action, last_tstep + STEP_DURATION, blocking=FLAGS.blocking
+                        )
 
                         # save image
                         images.append(image_obs)
