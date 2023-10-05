@@ -41,7 +41,7 @@ flags.DEFINE_integer("im_size", None, "Image size", required=True)
 flags.DEFINE_string("video_save_path", None, "Path to save video")
 flags.DEFINE_integer("num_timesteps", 120, "num timesteps")
 flags.DEFINE_bool("blocking", False, "Use the blocking controller")
-flags.DEFINE_spaceseplist("initial_eep", None, "Initial position")
+flags.DEFINE_spaceseplist("initial_eep", [0.3, 0.0, 0.15], "Initial position")
 flags.DEFINE_integer("act_exec_horizon", 1, "Action sequence length")
 flags.DEFINE_bool("deterministic", True, "Whether to sample action deterministically")
 

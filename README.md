@@ -43,11 +43,11 @@ Training hyperparameters can be modified in `experiments/configs/data_config.py`
 
 First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https://github.com/rail-berkeley/bridge_data_robot).
 
-To evaluate image-conditioned or language-conditioned BC, run `eval_gc.py` with `eval_lc.py` respectively in the docker container. (Refer to the [bridge_data_robot](https://github.com/rail-berkeley/bridge_data_robot) docs)
+To evaluate image-conditioned or language-conditioned methods, run `eval_gc.py` or `eval_lc.py` respectively in the docker container. (Refer to the [bridge_data_robot](https://github.com/rail-berkeley/bridge_data_robot) docs)
 
 **WidowXClient API**
 
-Optionally, you can run the `eval.py` with the new "server-client" `WidowXClient` Api. With this flexibility, you can run the code in a seperate env, e.g. (conda env on a cloud machine), without contraint of running it in the docker container.
+Optionally, you can run the `eval.py` which uses our newer `WidowXClient` API. With this setup, the robot is run as a server that receives actions and the policy acts as a client that sends actions. This "server-client" architecture allows us to both isolate robot controller and policy dependencies, as well as perform inference on a separate machine from the one used to control the robot (though in the simplest case, both the robot and policy can run on the same machine).
 
 First run the server on the robot
 
@@ -59,19 +59,19 @@ Then on a seperate terminal, run the `eval.py` in your local env. You can specif
 
 ```bash
 # Specify the path to the downloaded checkpoints directory
-export CHECKPOINT_DIR=/mount/harddrive/homer/checkpoints
+export CHECKPOINT_DIR=/path/to/checkpoint_dir
 
 # For GCBC
-python3 experiments/eval.py \
+python experiments/eval.py \
   --checkpoint_weights_path $CHECKPOINT_DIR/checkpoint_300000 \
   --checkpoint_config_path $CHECKPOINT_DIR/gcbc_256_config.json \
-  --im_size 256 --goal_type gc --show_image
+  --im_size 256 --goal_type gc --show_image --blocking
 
 # For LCBC
-python3 experiments/eval.py \
+python experiments/eval.py \
   --checkpoint_weights_path $CHECKPOINT_DIR/checkpoint_145000 \
   --checkpoint_config_path $CHECKPOINT_DIR/lcbc_256_config.json \
-  --im_size 256 --goal_type lc --show_image
+  --im_size 256 --goal_type lc --show_image --blocking
 ```
 
 You can also specify an initial position for the end effector with the flag `--initial_eep`. Similarly, use the flag `--goal_eep` to specify the position of the end effector when taking the goal image.

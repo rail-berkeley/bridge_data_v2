@@ -257,7 +257,8 @@ def main(_):
                 print("Waiting for observations...")
                 obs = widowx_client.get_observation()
                 time.sleep(1)
-            cv2.imshow("img_view", obs["full_image"])
+            bgr_img = cv2.cvtColor(obs["full_image"], cv2.COLOR_RGB2BGR)
+            cv2.imshow("img_view", bgr_img)
             cv2.waitKey(100)
 
         # request goal
@@ -306,7 +307,8 @@ def main(_):
                         continue
 
                     if FLAGS.show_image:
-                        cv2.imshow("img_view", obs["full_image"])
+                        bgr_img = cv2.cvtColor(obs["full_image"], cv2.COLOR_RGB2BGR)
+                        cv2.imshow("img_view", bgr_img)
                         cv2.waitKey(10)
 
                     image_obs = (
