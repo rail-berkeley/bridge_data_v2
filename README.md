@@ -41,7 +41,21 @@ Training hyperparameters can be modified in `experiments/configs/data_config.py`
 
 ## Evaluation
 
-First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https://github.com/rail-berkeley/bridge_data_robot). Then, run the command:
+First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https://github.com/rail-berkeley/bridge_data_robot).
+
+To evaluate image-conditioned or language-conditioned BC, run `eval_gc.py` with `eval_lc.py` respectively in the docker container. (Refer to the [bridge_data_robot](https://github.com/rail-berkeley/bridge_data_robot) docs)
+
+**WidowXClient API**
+
+Optionally, you can run the `eval.py` with the new "server-client" `WidowXClient` Api. With this flexibility, you can run the code in a seperate env, e.g. (conda env on a cloud machine), without contraint of running it in the docker container.
+
+First run the server on the robot
+
+```bash
+docker compose exec robonet bash -lic "widowx_env_service --server"
+```
+
+Then on a seperate terminal, run the `eval.py` in your local env. You can specify the IP of the remote server via `--ip`, default to `localhost`.
 
 ```bash
 # Specify the path to the downloaded checkpoints directory
@@ -61,8 +75,6 @@ python3 experiments/eval.py \
 ```
 
 You can also specify an initial position for the end effector with the flag `--initial_eep`. Similarly, use the flag `--goal_eep` to specify the position of the end effector when taking the goal image.
-
-To evaluate language-conditioned BC, replace `eval_gc.py` with `eval_lc.py` in the above command.
 
 ## Provided Checkpoints
 
