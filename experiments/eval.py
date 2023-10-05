@@ -47,8 +47,8 @@ flags.DEFINE_string("video_save_path", None, "Path to save video")
 flags.DEFINE_string("goal_image_path", None, "Path to a single goal image")  # not used by lc
 flags.DEFINE_integer("num_timesteps", 120, "num timesteps")
 flags.DEFINE_bool("blocking", False, "Use the blocking controller")
-flags.DEFINE_spaceseplist("goal_eep", None, "Goal position")  # not used by lc
-flags.DEFINE_spaceseplist("initial_eep", None, "Initial position")
+flags.DEFINE_spaceseplist("goal_eep", [0.3, 0.0, 0.15], "Goal position")  # not used by lc
+flags.DEFINE_spaceseplist("initial_eep", [0.3, 0.0, 0.15], "Initial position")
 flags.DEFINE_integer("act_exec_horizon", 1, "Action sequence length")
 flags.DEFINE_bool("deterministic", True, "Whether to sample action deterministically")
 flags.DEFINE_string("ip", "localhost", "IP address of the robot")
@@ -152,13 +152,8 @@ def request_goal_image(image_goal, widowx_client):
     else:
         ch = input("Taking a new goal? [y/n]")
     if ch == "y":
-        if FLAGS.goal_eep is not None:
-            assert isinstance(FLAGS.goal_eep, list)
-            goal_eep = [float(e) for e in FLAGS.goal_eep]
-        else:
-            low_bound = np.array(WORKSPACE_BOUNDS[0])[:3] + 0.03
-            high_bound = np.array(WORKSPACE_BOUNDS[1])[:3] - 0.03
-            goal_eep = np.random.uniform(low_bound, high_bound)
+        assert isinstance(FLAGS.goal_eep, list)
+        goal_eep = [float(e) for e in FLAGS.goal_eep]
         widowx_client.move_gripper(1.0)  # open gripper
 
         # retry move action until success
@@ -213,12 +208,9 @@ def main(_):
             checkpoint_weights_path, checkpoint_config_path
         )
 
-    if FLAGS.initial_eep is not None:
-        assert isinstance(FLAGS.initial_eep, list)
-        initial_eep = [float(e) for e in FLAGS.initial_eep]
-        start_state = np.concatenate([initial_eep, [0, 0, 0, 1]])
-    else:
-        start_state = None
+    assert isinstance(FLAGS.initial_eep, list)
+    initial_eep = [float(e) for e in FLAGS.initial_eep]
+    start_state = np.concatenate([initial_eep, [0, 0, 0, 1]])
 
     # set up environment
     env_params = {
@@ -229,7 +221,7 @@ def main(_):
         "override_workspace_boundaries": WORKSPACE_BOUNDS,
         "action_clipping": "xyz",
         "catch_environment_except": False,
-        "start_state": start_state,
+        "start_state": list(start_state),
         "return_full_image": False,
         "camera_topics": CAMERA_TOPICS,
     }
@@ -257,6 +249,16 @@ def main(_):
 
         policy_name = list(policies.keys())[policy_idx]
         get_action, obs_horizon, text_processors = policies[policy_name]
+
+        # show img for monitoring
+        if FLAGS.show_image:
+            obs = widowx_client.get_observation()
+            while obs is None:
+                print("Waiting for observations...")
+                obs = widowx_client.get_observation()
+                time.sleep(1)
+            cv2.imshow("img_view", obs["full_image"])
+            cv2.waitKey(100)
 
         # request goal
         if FLAGS.goal_type == "gc":
@@ -353,7 +355,7 @@ def main(_):
                             action[5] = 0
 
                         # perform environment step
-                        widowx_client.step_action(action)
+                        widowx_client.step_action(action, blocking=FLAGS.blocking)
 
                         # save image
                         images.append(image_obs)
