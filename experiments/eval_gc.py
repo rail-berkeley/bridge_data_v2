@@ -22,6 +22,7 @@ from jaxrl_m.agents import agents
 # bridge_data_robot imports
 from widowx_envs.widowx_env import BridgeDataRailRLPrivateWidowX
 from multicam_server.topic_utils import IMTopic
+from utils import stack_obs
 
 np.set_printoptions(suppress=True)
 
@@ -40,8 +41,8 @@ flags.DEFINE_string("video_save_path", None, "Path to save video")
 flags.DEFINE_string("goal_image_path", None, "Path to a single goal image")
 flags.DEFINE_integer("num_timesteps", 120, "num timesteps")
 flags.DEFINE_bool("blocking", False, "Use the blocking controller")
-flags.DEFINE_spaceseplist("goal_eep", None, "Goal position")
-flags.DEFINE_spaceseplist("initial_eep", None, "Initial position")
+flags.DEFINE_spaceseplist("goal_eep", [0.3, 0.0, 0.15], "Goal position")
+flags.DEFINE_spaceseplist("initial_eep", [0.3, 0.0, 0.15], "Initial position")
 flags.DEFINE_integer("act_exec_horizon", 1, "Action sequence length")
 flags.DEFINE_bool("deterministic", True, "Whether to sample action deterministically")
 
@@ -56,14 +57,6 @@ CAMERA_TOPICS = [IMTopic("/blue/image_raw")]
 FIXED_STD = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 ##############################################################################
-
-
-def stack_obs(obs):
-    dict_list = {k: [dic[k] for dic in obs] for k in obs[0]}
-    return jax.tree_map(
-        lambda x: np.stack(x), dict_list, is_leaf=lambda x: type(x) == list
-    )
-
 
 def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
     with open(checkpoint_config_path, "r") as f:

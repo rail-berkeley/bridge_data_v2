@@ -1,3 +1,9 @@
-from setuptools import setup
+import setuptools
 
-setup(name="jaxrl_m", packages=["jaxrl_m"])
+setuptools.setup(
+    name='jaxrl_m',
+    version='0.0.2',
+    packages=setuptools.find_packages(),
+    license='MIT License',
+    long_description=open('README.md').read(),
+)

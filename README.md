@@ -36,25 +36,45 @@ python experiments/train.py \
     --name NAME
 ```
 
+
 Training hyperparameters can be modified in `experiments/configs/data_config.py` and data parameters (e.g. subsets to include/exclude) can be modified in `experiments/configs/train_config.py`. 
 
 ## Evaluation
 
-First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https://github.com/rail-berkeley/bridge_data_robot). Then, run the command:
+First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https://github.com/rail-berkeley/bridge_data_robot).
 
+To evaluate image-conditioned or language-conditioned methods, run `eval_gc.py` or `eval_lc.py` respectively in the docker container. (Refer to the [bridge_data_robot](https://github.com/rail-berkeley/bridge_data_robot) docs)
+
+**WidowXClient API**
+
+Optionally, you can run the `eval.py` which uses our newer `WidowXClient` API. With this setup, the robot is run as a server that receives actions and the policy acts as a client that sends actions. This "server-client" architecture allows us to both isolate robot controller and policy dependencies, as well as perform inference on a separate machine from the one used to control the robot (though in the simplest case, both the robot and policy can run on the same machine).
+
+First run the server on the robot
+
+```bash
+docker compose exec robonet bash -lic "widowx_env_service --server"
 ```
-python experiments/eval_gc.py \
-    --num_timesteps NUM_TIMESTEPS \
-    --video_save_path VIDEO_DIR \
-    --checkpoint_weights_path CHECKPOINT_WEIGHTS_PATH \
-    --checkpoint_config_path CHECKPOINT_CONFIG_PATH \
-    --im_size IMAGE_SIZE
-    --blocking
+
+Then on a seperate terminal, run the `eval.py` in your local env. You can specify the IP of the remote server via `--ip`, default to `localhost`.
+
+```bash
+# Specify the path to the downloaded checkpoints directory
+export CHECKPOINT_DIR=/path/to/checkpoint_dir
+
+# For GCBC
+python experiments/eval.py \
+  --checkpoint_weights_path $CHECKPOINT_DIR/checkpoint_300000 \
+  --checkpoint_config_path $CHECKPOINT_DIR/gcbc_256_config.json \
+  --im_size 256 --goal_type gc --show_image --blocking
+
+# For LCBC
+python experiments/eval.py \
+  --checkpoint_weights_path $CHECKPOINT_DIR/checkpoint_145000 \
+  --checkpoint_config_path $CHECKPOINT_DIR/lcbc_256_config.json \
+  --im_size 256 --goal_type lc --show_image --blocking
 ```
 
 You can also specify an initial position for the end effector with the flag `--initial_eep`. Similarly, use the flag `--goal_eep` to specify the position of the end effector when taking the goal image.
-
-To evaluate language-conditioned BC, replace `eval_gc.py` with `eval_lc.py` in the above command.
 
 ## Provided Checkpoints
 
@@ -66,14 +86,14 @@ We don't currently have a checkpoints for ACT or RT-1 available but may release 
 
 The dependencies for this codebase can be installed in a conda environment:
 
-```
+```bash
 conda create -n jaxrl python=3.10
 conda activate jaxrl
 pip install -e . 
 pip install -r requirements.txt
 ```
 For GPU:
-```
+```bash
 pip install --upgrade "jax[cuda11_pip]==0.4.13" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
