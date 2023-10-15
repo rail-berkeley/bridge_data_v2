@@ -24,7 +24,7 @@ from jaxrl_m.agents import agents
 from jaxrl_m.data.text_processing import text_processors
 
 # bridge_data_robot imports
-from widowx_envs.widowx_env_service import WidowXClient, WidowXStatus
+from widowx_envs.widowx_env_service import WidowXClient, WidowXStatus, WidowXConfigs
 from utils import state_to_eep, stack_obs
 
 ##############################################################################
@@ -44,10 +44,14 @@ flags.DEFINE_multi_string(
 flags.DEFINE_string("goal_type", None, "Goal type", required=True)
 flags.DEFINE_integer("im_size", None, "Image size", required=True)
 flags.DEFINE_string("video_save_path", None, "Path to save video")
-flags.DEFINE_string("goal_image_path", None, "Path to a single goal image")  # not used by lc
+flags.DEFINE_string(
+    "goal_image_path", None, "Path to a single goal image"
+)  # not used by lc
 flags.DEFINE_integer("num_timesteps", 120, "num timesteps")
 flags.DEFINE_bool("blocking", False, "Use the blocking controller")
-flags.DEFINE_spaceseplist("goal_eep", [0.3, 0.0, 0.15], "Goal position")  # not used by lc
+flags.DEFINE_spaceseplist(
+    "goal_eep", [0.3, 0.0, 0.15], "Goal position"
+)  # not used by lc
 flags.DEFINE_spaceseplist("initial_eep", [0.3, 0.0, 0.15], "Initial position")
 flags.DEFINE_integer("act_exec_horizon", 1, "Action sequence length")
 flags.DEFINE_bool("deterministic", True, "Whether to sample action deterministically")
@@ -66,6 +70,11 @@ STICKY_GRIPPER_NUM_STEPS = 1
 WORKSPACE_BOUNDS = [[0.1, -0.15, -0.01, -1.57, 0], [0.45, 0.25, 0.25, 1.57, 0]]
 CAMERA_TOPICS = [{"name": "/blue/image_raw"}]
 FIXED_STD = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+ENV_PARAMS = {
+    "camera_topics": CAMERA_TOPICS,
+    "override_workspace_boundaries": WORKSPACE_BOUNDS,
+    "move_duration": STEP_DURATION,
+}
 
 ##############################################################################
 
@@ -159,8 +168,8 @@ def request_goal_image(image_goal, widowx_client):
         # retry move action until success
         goal_eep = state_to_eep(goal_eep, 0)
         move_status = None
-        while move_status != WidowXStatus.SUCCESS:
-            move_status = widowx_client.move(goal_eep, duration=1.5)
+        # while move_status != WidowXStatus.SUCCESS:
+        move_status = widowx_client.move(goal_eep, blocking=True, duration=1.5)
 
         input("Press [Enter] when ready for taking the goal image. ")
 
@@ -193,6 +202,7 @@ def request_goal_language(instruction, text_processor):
 
 ##############################################################################
 
+
 def main(_):
     assert len(FLAGS.checkpoint_weights_path) == len(FLAGS.checkpoint_config_path)
 
@@ -210,22 +220,11 @@ def main(_):
 
     assert isinstance(FLAGS.initial_eep, list)
     initial_eep = [float(e) for e in FLAGS.initial_eep]
-    start_state = np.concatenate([initial_eep, [0, 0, 0, 1]])
 
     # set up environment
-    env_params = {
-        "fix_zangle": 0.1,
-        "move_duration": 0.2,
-        "adaptive_wait": True,
-        "move_to_rand_start_freq": 1,
-        "override_workspace_boundaries": WORKSPACE_BOUNDS,
-        "action_clipping": "xyz",
-        "catch_environment_except": False,
-        "start_state": list(start_state),
-        "return_full_image": False,
-        "camera_topics": CAMERA_TOPICS,
-    }
-    widowx_client = WidowXClient(FLAGS.ip, FLAGS.port)
+    env_params = WidowXConfigs.DefaultEnvParams.copy()
+    env_params.update(ENV_PARAMS)
+    widowx_client = WidowXClient(host=FLAGS.ip, port=FLAGS.port)
     widowx_client.init(env_params, image_size=FLAGS.im_size)
 
     # load goals
@@ -272,10 +271,6 @@ def main(_):
         else:
             raise ValueError(f"Unknown goal type: {FLAGS.goal_type}")
 
-        # reset env
-        widowx_client.reset()
-        time.sleep(2.5)
-
         # move to initial position
         if FLAGS.initial_eep is not None:
             assert isinstance(FLAGS.initial_eep, list)
@@ -284,8 +279,8 @@ def main(_):
 
             # retry move action until success
             move_status = None
-            while move_status != WidowXStatus.SUCCESS:
-                move_status = widowx_client.move(eep, duration=1.5)
+            # while move_status != WidowXStatus.SUCCESS:
+            move_status = widowx_client.move(eep, blocking=True, duration=1.5)
 
         # do rollout
         last_tstep = time.time()
@@ -300,7 +295,6 @@ def main(_):
         try:
             while t < FLAGS.num_timesteps:
                 if time.time() > last_tstep + STEP_DURATION or FLAGS.blocking:
-
                     obs = widowx_client.get_observation()
                     if obs is None:
                         print("WARNING retrying to get observation...")
@@ -357,7 +351,9 @@ def main(_):
                             action[5] = 0
 
                         # perform environment step
-                        widowx_client.step_action(action, blocking=FLAGS.blocking)
+                        widowx_client.step_action(
+                            action, last_tstep + STEP_DURATION, blocking=FLAGS.blocking
+                        )
 
                         # save image
                         images.append(image_obs)
@@ -377,7 +373,9 @@ def main(_):
                 f"{curr_time}_{policy_name}_sticky_{STICKY_GRIPPER_NUM_STEPS}.mp4",
             )
             if FLAGS.goal_type == "gc":
-                video = np.concatenate([np.stack(image_goals), np.stack(images)], axis=1)
+                video = np.concatenate(
+                    [np.stack(image_goals), np.stack(images)], axis=1
+                )
                 imageio.mimsave(save_path, video, fps=1.0 / STEP_DURATION * 3)
             else:
                 imageio.mimsave(save_path, images, fps=1.0 / STEP_DURATION * 3)
