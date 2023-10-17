@@ -46,7 +46,8 @@ def uniform(traj, *, reached_proportion):
 
     # select goals
     traj["goals"] = tf.nest.map_structure(
-        lambda x: tf.gather(x, goal_idxs), traj["next_observations"]
+        lambda x: tf.gather(x, goal_idxs),
+        traj["next_observations"],
     )
 
     # reward is 0 for goal-reaching transitions, -1 otherwise
@@ -69,7 +70,12 @@ def last_state_upweighted(traj, *, reached_proportion):
     traj_len = tf.shape(traj["terminals"])[0]
 
     # select a random future index for each transition
-    offsets = tf.random.uniform([traj_len], minval=1, maxval=traj_len, dtype=tf.int32)
+    offsets = tf.random.uniform(
+        [traj_len],
+        minval=1,
+        maxval=traj_len,
+        dtype=tf.int32,
+    )
 
     # select random transitions to relabel as goal-reaching
     goal_reached_mask = tf.random.uniform([traj_len]) < reached_proportion
@@ -89,7 +95,8 @@ def last_state_upweighted(traj, *, reached_proportion):
 
     # select goals
     traj["goals"] = tf.nest.map_structure(
-        lambda x: tf.gather(x, indices), traj["next_observations"]
+        lambda x: tf.gather(x, indices),
+        traj["next_observations"],
     )
 
     # reward is 0 for goal-reaching transitions, -1 otherwise
@@ -135,7 +142,8 @@ def geometric(traj, *, reached_proportion, discount):
 
     # select goals
     traj["goals"] = tf.nest.map_structure(
-        lambda x: tf.gather(x, goal_idxs), traj["next_observations"]
+        lambda x: tf.gather(x, goal_idxs),
+        traj["next_observations"],
     )
 
     # reward is 0 for goal-reaching transitions, -1 otherwise
@@ -147,8 +155,55 @@ def geometric(traj, *, reached_proportion, discount):
     return traj
 
 
+def delta_goals(traj, *, goal_delta):
+    """
+    Relabels with a uniform distribution over future states in the range [i +
+    goal_delta[0], min{traj_len, i + goal_delta[1]}). Truncates trajectories to
+    have length traj_len - goal_delta[0]. Not suitable for RL (does not add
+    terminals or rewards).
+    """
+    traj_len = tf.shape(traj["terminals"])[0]
+
+    # add the last observation (which only exists in next_observations) to get
+    # all the observations
+    all_obs = tf.nest.map_structure(
+        lambda obs, next_obs: tf.concat([obs, next_obs[-1:]], axis=0),
+        traj["observations"],
+        traj["next_observations"],
+    )
+    all_obs_len = traj_len + 1
+
+    # current obs should only come from [0, traj_len - goal_delta[0])
+    curr_idxs = tf.range(traj_len - goal_delta[0])
+
+    # select a random future index for each transition i in the range [i + goal_delta[0], min{all_obs_len, i + goal_delta[1]})
+    rand = tf.random.uniform([traj_len - goal_delta[0]])
+    low = tf.cast(curr_idxs + goal_delta[0], tf.float32)
+    high = tf.cast(tf.minimum(all_obs_len, curr_idxs + goal_delta[1]), tf.float32)
+    goal_idxs = tf.cast(rand * (high - low) + low, tf.int32)
+
+    # very rarely, floating point errors can cause goal_idxs to be out of bounds
+    goal_idxs = tf.minimum(goal_idxs, all_obs_len - 1)
+
+    traj_truncated = tf.nest.map_structure(
+        lambda x: tf.gather(x, curr_idxs),
+        traj,
+    )
+
+    # select goals
+    traj_truncated["goals"] = tf.nest.map_structure(
+        lambda x: tf.gather(x, goal_idxs),
+        all_obs,
+    )
+
+    traj_truncated["goal_dists"] = goal_idxs - curr_idxs
+
+    return traj_truncated
+
+
 GOAL_RELABELING_FUNCTIONS = {
     "uniform": uniform,
     "last_state_upweighted": last_state_upweighted,
     "geometric": geometric,
+    "delta_goals": delta_goals,
 }
