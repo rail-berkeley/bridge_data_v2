@@ -168,8 +168,8 @@ def request_goal_image(image_goal, widowx_client):
         # retry move action until success
         goal_eep = state_to_eep(goal_eep, 0)
         move_status = None
-        # while move_status != WidowXStatus.SUCCESS:
-        move_status = widowx_client.move(goal_eep, blocking=True, duration=1.5)
+        while move_status != WidowXStatus.SUCCESS:
+            move_status = widowx_client.move(goal_eep, duration=1.5)
 
         input("Press [Enter] when ready for taking the goal image. ")
 
@@ -220,10 +220,12 @@ def main(_):
 
     assert isinstance(FLAGS.initial_eep, list)
     initial_eep = [float(e) for e in FLAGS.initial_eep]
+    start_state = np.concatenate([initial_eep, [0, 0, 0, 1]])
 
     # set up environment
     env_params = WidowXConfigs.DefaultEnvParams.copy()
     env_params.update(ENV_PARAMS)
+    env_params["state_state"] = list(start_state)
     widowx_client = WidowXClient(host=FLAGS.ip, port=FLAGS.port)
     widowx_client.init(env_params, image_size=FLAGS.im_size)
 
@@ -268,19 +270,24 @@ def main(_):
         elif FLAGS.goal_type == "lc":
             instruction = request_goal_language(None, text_processors)
             goal_obs = {"language": instruction}
+            input("Press [Enter] to start.")
         else:
             raise ValueError(f"Unknown goal type: {FLAGS.goal_type}")
+
+        widowx_client.reset()
+        time.sleep(2.5)
 
         # move to initial position
         if FLAGS.initial_eep is not None:
             assert isinstance(FLAGS.initial_eep, list)
             initial_eep = [float(e) for e in FLAGS.initial_eep]
             eep = state_to_eep(initial_eep, 0)
+            widowx_client.move_gripper(1.0)  # open gripper
 
             # retry move action until success
             move_status = None
-            # while move_status != WidowXStatus.SUCCESS:
-            move_status = widowx_client.move(eep, blocking=True, duration=1.5)
+            while move_status != WidowXStatus.SUCCESS:
+                move_status = widowx_client.move(eep, duration=1.5)
 
         # do rollout
         last_tstep = time.time()
@@ -351,9 +358,7 @@ def main(_):
                             action[5] = 0
 
                         # perform environment step
-                        widowx_client.step_action(
-                            action, last_tstep + STEP_DURATION, blocking=FLAGS.blocking
-                        )
+                        widowx_client.step_action(action, blocking=FLAGS.blocking)
 
                         # save image
                         images.append(image_obs)
