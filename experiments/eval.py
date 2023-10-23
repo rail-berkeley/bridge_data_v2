@@ -274,6 +274,7 @@ def main(_):
         else:
             raise ValueError(f"Unknown goal type: {FLAGS.goal_type}")
 
+        # reset env
         widowx_client.reset()
         time.sleep(2.5)
 
