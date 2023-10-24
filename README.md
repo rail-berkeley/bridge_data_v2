@@ -36,26 +36,15 @@ python experiments/train.py \
     --name NAME
 ```
 
-
 Training hyperparameters can be modified in `experiments/configs/data_config.py` and data parameters (e.g. subsets to include/exclude) can be modified in `experiments/configs/train_config.py`. 
 
 ## Evaluation
 
 First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https://github.com/rail-berkeley/bridge_data_robot).
 
-To evaluate image-conditioned or language-conditioned methods, run `eval_gc.py` or `eval_lc.py` respectively in the docker container. (Refer to the [bridge_data_robot](https://github.com/rail-berkeley/bridge_data_robot) docs)
+There are two ways to interface a policy with the robot controller: the docker compose service method or the server-client method. Refer to the [bridge_data_robot](https://github.com/rail-berkeley/bridge_data_robot) docs for an explanation of how to set up each method. In general, we recommend the server-client method.
 
-**WidowXClient API**
-
-Optionally, you can run the `eval.py` which uses our newer `WidowXClient` API. With this setup, the robot is run as a server that receives actions and the policy acts as a client that sends actions. This "server-client" architecture allows us to both isolate robot controller and policy dependencies, as well as perform inference on a separate machine from the one used to control the robot (though in the simplest case, both the robot and policy can run on the same machine).
-
-First run the server on the robot
-
-```bash
-docker compose exec robonet bash -lic "widowx_env_service --server"
-```
-
-Then on a seperate terminal, run the `eval.py` in your local env. You can specify the IP of the remote server via `--ip`, default to `localhost`.
+For the server-client method, start the server on the robot. Then run the following commands on the client. You can specify the IP of the remote server via the `--ip` flag. The default IP is `localhost` (i.e the server and client are the same machine). 
 
 ```bash
 # Specify the path to the downloaded checkpoints directory
@@ -74,7 +63,9 @@ python experiments/eval.py \
   --im_size 256 --goal_type lc --show_image --blocking
 ```
 
-You can also specify an initial position for the end effector with the flag `--initial_eep`. Similarly, use the flag `--goal_eep` to specify the position of the end effector when taking the goal image.
+You can also specify an initial position for the end effector with the flag `--initial_eep`. Similarly, use the flag `--goal_eep` to specify the position of the end effector when taking a goal image.
+
+To evaluate image-conditioned or language-conditioned methods with the docker compose service method, run `eval_gc.py` or `eval_lc.py` respectively in the `bridge_data_v2` docker container.
 
 ## Provided Checkpoints
 
