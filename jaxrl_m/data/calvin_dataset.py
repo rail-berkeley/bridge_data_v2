@@ -182,7 +182,7 @@ class CalvinDataset:
         dataset = dataset.map(self._decode_example, num_parallel_calls=tf.data.AUTOTUNE)
 
         # yields trajectories
-        dataset = dataset.map(self._process_actions, num_parallel_calls=tf.data.AUTOTUNE)
+        #dataset = dataset.map(self._process_actions, num_parallel_calls=tf.data.AUTOTUNE) # we're skipping action normalization
 
         # yields trajectories
         dataset = dataset.map(self._chunk_act_obs, num_parallel_calls=tf.data.AUTOTUNE)
